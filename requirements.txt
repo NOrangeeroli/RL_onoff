@@ -1,0 +1,26 @@
+# Core dependencies
+torch>=2.0.0
+transformers>=4.30.0
+numpy>=1.24.0
+scipy>=1.10.0
+pandas>=2.0.0
+datasets>=2.14.0
+tqdm>=4.65.0
+
+# CLI interface
+click>=8.1.0
+
+# Metrics dependencies
+nltk>=3.8.0
+rouge-score>=0.1.2
+
+# Optional backends
+# vllm>=0.2.0  # Uncomment if using vLLM backend
+# sglang>=0.1.0  # Uncomment if using SGLang backend
+
+# Development dependencies (optional)
+# pytest>=7.4.0
+# pytest-cov>=4.1.0
+# black>=23.7.0
+# flake8>=6.1.0
+
