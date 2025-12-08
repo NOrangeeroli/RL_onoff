@@ -1,10 +1,4 @@
-# This file is kept for backward compatibility
-# For separate backend environments, use:
-#   - environment_huggingface.yml  (default, flexible PyTorch version)
-#   - environment_vllm.yml         (requires torch==2.5.1 for vLLM 0.6.5)
-#   - environment_sglang.yml       (requires compiled kernels)
-
-name: rl_onoff
+name: rl_onoff_hf
 channels:
   - pytorch
   - conda-forge
@@ -18,7 +12,7 @@ dependencies:
   - scipy>=1.10.0
   - pandas>=2.0.0
   
-  # PyTorch ecosystem (flexible version for HuggingFace - default backend)
+  # PyTorch ecosystem (flexible version for HuggingFace)
   - pytorch>=2.0.0
   - pytorch-cuda=11.8  # CUDA support (adjust version as needed)
   - cudatoolkit=11.8  # CUDA toolkit (if needed)

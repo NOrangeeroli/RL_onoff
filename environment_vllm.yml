@@ -1,10 +1,4 @@
-# This file is kept for backward compatibility
-# For separate backend environments, use:
-#   - environment_huggingface.yml  (default, flexible PyTorch version)
-#   - environment_vllm.yml         (requires torch==2.5.1 for vLLM 0.6.5)
-#   - environment_sglang.yml       (requires compiled kernels)
-
-name: rl_onoff
+name: rl_onoff_vllm
 channels:
   - pytorch
   - conda-forge
@@ -18,8 +12,9 @@ dependencies:
   - scipy>=1.10.0
   - pandas>=2.0.0
   
-  # PyTorch ecosystem (flexible version for HuggingFace - default backend)
-  - pytorch>=2.0.0
+  # PyTorch ecosystem (specific versions required by vLLM 0.6.5)
+  - pytorch=2.5.1  # Required by vLLM 0.6.5 and xformers
+  - torchvision=0.20.1  # Compatible with pytorch 2.5.1
   - pytorch-cuda=11.8  # CUDA support (adjust version as needed)
   - cudatoolkit=11.8  # CUDA toolkit (if needed)
   
@@ -67,6 +62,9 @@ dependencies:
     - trl>=0.8.6,<=0.9.6  # Required by llamafactory
     - lark>=1.1.5,<1.2.0  # Required by pddl
     - outlines-core==0.1.26  # Required by outlines
+    
+    # vLLM backend (requires torch==2.5.1, specified above)
+    - vllm==0.6.5  # Pin version for compatibility
     
     # Development dependencies
     - pytest>=7.4.0
