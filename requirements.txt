@@ -1,5 +1,7 @@
 # Core dependencies
-torch>=2.0.0
+# Note: vLLM 0.6.5 requires torch==2.5.1, but we allow flexibility
+# If using vLLM, install compatible versions separately: pip install torch==2.5.1 torchvision==0.20.1
+torch>=2.0.0  # vLLM may require specific version (2.5.1), install separately if needed
 transformers>=4.30.0
 numpy>=1.24.0,<2.0.0  # Constrained for llamafactory compatibility
 scipy>=1.10.0
@@ -26,14 +28,32 @@ tenacity>=6.2.0  # Required by plotly
 lxml>=4.0.0  # Required by sacrebleu
 markdown>=2.6.8  # Required by tensorboard
 
+# Missing dependencies for various packages
+defusedxml>=0.7.1  # Required by cairosvg
+cryptography>=3.4.8  # Required by aliyun-python-sdk-core
+smmap>=5.0.0  # Required by gitdb
+more-itertools>=8.14.0  # Required by inflect
+tornado>=6.1  # Required by livereload
+chardet>=5.0.0  # Required by mbstrdecoder
+pyasn1>=0.4.8  # Required by rsa
+
 # Version constraints for compatibility
-pydantic<=2.10.6  # Required by llamafactory
+# WARNING: llamafactory requires pydantic<=2.10.6, but other packages may require newer versions
+# If you encounter conflicts, prioritize llamafactory's requirement
+pydantic<=2.10.6  # Required by llamafactory (conflicts with openai-harmony>=2.11.7 which requires pydantic>=2.11.7)
 trl>=0.8.6,<=0.9.6  # Required by llamafactory
 lark>=1.1.5,<1.2.0  # Required by pddl
 outlines-core==0.1.26  # Required by outlines
 
 # Optional backends
-vllm>=0.2.0  # Uncomment if using vLLM backend
+# vLLM installation notes:
+# - vLLM 0.6.5 requires specific versions: torch==2.5.1, torchvision==0.20.1
+# - If you encounter version conflicts, install vLLM separately with compatible versions:
+#   pip install torch==2.5.1 torchvision==0.20.1 vllm==0.6.5
+# - xformers 0.0.28.post3 also requires torch==2.5.1
+# - Consider using a newer vLLM version that supports newer torch versions, or downgrade torch
+#vllm>=0.2.0  # Uncomment if using vLLM backend (see notes above about version conflicts)
+
 # SGLang installation notes:
 # - To install with compiled kernels (required for runtime): pip install 'sglang[all]'
 # - If you get "ModuleNotFoundError: No module named 'sgl_kernel'", you need to:
@@ -41,7 +61,12 @@ vllm>=0.2.0  # Uncomment if using vLLM backend
 #   2. Or build from source: git clone https://github.com/sgl-project/sglang.git && cd sglang && pip install -e ".[all]"
 #   3. Ensure CUDA toolkit and compatible PyTorch with CUDA support are installed
 #   4. Check environment: python -m sglang.check_env
-sglang>=0.1.0  # Uncomment if using SGLang backend (install with: pip install 'sglang[all]')
+#sglang>=0.1.0  # Uncomment if using SGLang backend (install with: pip install 'sglang[all]')
+
+# Platform-specific packages (may not be available on all platforms)
+# ninja>=1.11.1.1  # Build tool, may not be supported on all platforms
+# decord>=0.6.0  # Video decoding, may not be supported on all platforms
+# Install these separately if needed for your platform
 
 # Development dependencies (optional)
 pytest>=7.4.0
