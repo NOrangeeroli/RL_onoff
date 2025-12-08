@@ -34,7 +34,14 @@ outlines-core==0.1.26  # Required by outlines
 
 # Optional backends
 vllm>=0.2.0  # Uncomment if using vLLM backend
-sglang>=0.1.0  # Uncomment if using SGLang backend
+# SGLang installation notes:
+# - To install with compiled kernels (required for runtime): pip install 'sglang[all]'
+# - If you get "ModuleNotFoundError: No module named 'sgl_kernel'", you need to:
+#   1. Install with: pip install 'sglang[all]' (includes compiled components)
+#   2. Or build from source: git clone https://github.com/sgl-project/sglang.git && cd sglang && pip install -e ".[all]"
+#   3. Ensure CUDA toolkit and compatible PyTorch with CUDA support are installed
+#   4. Check environment: python -m sglang.check_env
+sglang>=0.1.0  # Uncomment if using SGLang backend (install with: pip install 'sglang[all]')
 
 # Development dependencies (optional)
 pytest>=7.4.0
