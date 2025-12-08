@@ -204,12 +204,12 @@ class TestDataLoader:
             assert isinstance(data, list)
             assert len(data) > 0
             
-            # Verify structure - should have question and solution keys
+            # Verify structure - should have problem and solution keys
             assert "problem" in data[0]
             assert "solution" in data[0]
             
             # Verify data types
-            assert isinstance(data[0]["question"], str)
+            assert isinstance(data[0]["problem"], str)
             assert isinstance(data[0]["solution"], str)
             
             # Verify we can load a reasonable amount of data
