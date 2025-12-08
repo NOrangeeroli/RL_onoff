@@ -63,9 +63,9 @@ class VLLMBackend(BaseBackend):
         self,
         prompts: Union[str, List[str]],
         max_new_tokens: int = 100,
-        temperature: float = 1.0,
+        temperature: float = 0.9,
         top_k: Optional[int] = None,
-        top_p: Optional[float] = None,
+        top_p: Optional[float] = 0.95,
         do_sample: bool = True,
         **kwargs
     ) -> Union[str, List[str]]:
