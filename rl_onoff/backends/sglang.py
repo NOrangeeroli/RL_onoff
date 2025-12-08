@@ -71,8 +71,8 @@ class SGLangBackend(BaseBackend):
         prompts: Union[str, List[str]],
         max_new_tokens: int = 100,
         temperature: float = 1.0,
-        top_k: Optional[int] = None,
-        top_p: Optional[float] = None,
+        top_k: Optional[int] = -1,
+        top_p: Optional[float] = 1,
         do_sample: bool = True,
         **kwargs
     ) -> Union[str, List[str]]:
