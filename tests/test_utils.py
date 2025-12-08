@@ -83,8 +83,13 @@ def sample_json_file():
     ]
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
         json.dump(data, f)
-        yield f.name
-    os.unlink(f.name)
+        f.flush()
+        fname = f.name
+    # File is now closed, yield the filename
+    yield fname
+    # Cleanup
+    if os.path.exists(fname):
+        os.unlink(fname)
 
 
 @pytest.fixture
@@ -97,8 +102,13 @@ def sample_jsonl_file():
     with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
         for item in data:
             f.write(json.dumps(item) + '\n')
-        yield f.name
-    os.unlink(f.name)
+        f.flush()
+        fname = f.name
+    # File is now closed, yield the filename
+    yield fname
+    # Cleanup
+    if os.path.exists(fname):
+        os.unlink(fname)
 
 
 @pytest.fixture
@@ -109,12 +119,17 @@ def sample_csv_file():
         {"question": "What is 2+2?", "solution": "4"},
         {"question": "What is 3+3?", "solution": "6"}
     ]
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, newline='') as f:
         writer = csv.DictWriter(f, fieldnames=["question", "solution"])
         writer.writeheader()
         writer.writerows(data)
-        yield f.name
-    os.unlink(f.name)
+        f.flush()
+        fname = f.name
+    # File is now closed, yield the filename
+    yield fname
+    # Cleanup
+    if os.path.exists(fname):
+        os.unlink(fname)
 
 
 class TestUtilsSamplingAndMetrics:
