@@ -1,11 +1,12 @@
-"""Metrics framework for evaluating model outputs."""
+"""Rewards framework for evaluating model outputs."""
 
-from rl_onoff.metrics.base import BaseMetric, MetricRegistry
-from rl_onoff.metrics.builtin import (
+from rl_onoff.tasks.rewards.base import BaseMetric, MetricRegistry
+from rl_onoff.tasks.rewards.builtin import (
     PerplexityMetric,
     BLEUMetric,
     ROUGEMetric,
     ExactMatchMetric,
+    MathVerifyMetric,
 )
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "BLEUMetric",
     "ROUGEMetric",
     "ExactMatchMetric",
+    "MathVerifyMetric",
 ]
 

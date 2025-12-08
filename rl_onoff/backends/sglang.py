@@ -1,6 +1,6 @@
 """SGLang backend implementation."""
 
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional, Union, Any
 import numpy as np
 
 from rl_onoff.backends.base import BaseBackend
@@ -74,8 +74,10 @@ class SGLangBackend(BaseBackend):
         top_k: Optional[int] = -1,
         top_p: Optional[float] = 1,
         do_sample: bool = True,
+        return_logits: bool = False,
+        return_probs: bool = False,
         **kwargs
-    ) -> Union[str, List[str]]:
+    ) -> Union[str, List[str], Dict[str, Any], List[Dict[str, Any]]]:
         """Generate text from prompts."""
         if not self._is_loaded:
             self.load()
@@ -96,6 +98,13 @@ class SGLangBackend(BaseBackend):
         if top_p is not None:
             sampling_params["top_p"] = top_p
 
+        # Check if logits/probs are requested (not yet supported for SGLang)
+        if return_logits or return_probs:
+            raise NotImplementedError(
+                "return_logits and return_probs are not yet supported for SGLang backend. "
+                "Please use HuggingFace backend for this functionality."
+            )
+        
         # Generate using SGLang
         # Note: SGLang API may vary - this is a simplified version
         outputs = []

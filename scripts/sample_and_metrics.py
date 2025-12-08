@@ -9,8 +9,8 @@ from tqdm import tqdm
 
 from rl_onoff.backends import get_backend
 from rl_onoff.sampling import Sampler, SamplingConfig
-from rl_onoff.metrics import MetricRegistry
-from rl_onoff.metrics.builtin import (
+from rl_onoff.tasks.rewards import MetricRegistry
+from rl_onoff.tasks.rewards.builtin import (
     PerplexityMetric,
     BLEUMetric,
     ROUGEMetric,

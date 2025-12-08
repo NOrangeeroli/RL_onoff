@@ -93,8 +93,8 @@ response = backend.generate("Hello, world!", max_new_tokens=50)
 
 ```python
 from rl_onoff.sampling import Sampler, SamplingConfig
-from rl_onoff.metrics import MetricRegistry
-from rl_onoff.metrics.builtin import BLEUMetric, ROUGEMetric
+from rl_onoff.tasks.rewards import MetricRegistry
+from rl_onoff.tasks.rewards.builtin import BLEUMetric, ROUGEMetric
 
 # Initialize sampler
 sampler = Sampler(backend)

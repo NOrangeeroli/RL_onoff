@@ -38,8 +38,10 @@ class BaseBackend(ABC):
         top_k: Optional[int] = None,
         top_p: Optional[float] = None,
         do_sample: bool = True,
+        return_logits: bool = False,
+        return_probs: bool = False,
         **kwargs
-    ) -> Union[str, List[str]]:
+    ) -> Union[str, List[str], Dict[str, Any], List[Dict[str, Any]]]:
         """Generate text from prompts.
         
         Args:
@@ -49,10 +51,18 @@ class BaseBackend(ABC):
             top_k: Top-k sampling parameter
             top_p: Top-p (nucleus) sampling parameter
             do_sample: Whether to use sampling
+            return_logits: If True, return logits along with generated text
+            return_probs: If True, return probabilities along with generated text
             **kwargs: Additional generation arguments
             
         Returns:
-            Generated text(s) as string or list of strings
+            If return_logits=False and return_probs=False:
+                Generated text(s) as string or list of strings
+            If return_logits=True or return_probs=True:
+                Dictionary or list of dictionaries with keys:
+                - 'text': Generated text
+                - 'logits': Logits array (if return_logits=True)
+                - 'probs': Probabilities array (if return_probs=True)
         """
         pass
 

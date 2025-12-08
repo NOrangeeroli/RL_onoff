@@ -1,6 +1,6 @@
 """vLLM backend implementation."""
 
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional, Union, Any
 import numpy as np
 
 from rl_onoff.backends.base import BaseBackend
@@ -67,8 +67,10 @@ class VLLMBackend(BaseBackend):
         top_k: Optional[int] = -1,
         top_p: Optional[float] = 1,
         do_sample: bool = True,
+        return_logits: bool = False,
+        return_probs: bool = False,
         **kwargs
-    ) -> Union[str, List[str]]:
+    ) -> Union[str, List[str], Dict[str, Any], List[Dict[str, Any]]]:
         """Generate text from prompts."""
         if not self._is_loaded:
             self.load()
@@ -86,6 +88,13 @@ class VLLMBackend(BaseBackend):
             **kwargs
         )
 
+        # Check if logits/probs are requested (not yet supported for vLLM)
+        if return_logits or return_probs:
+            raise NotImplementedError(
+                "return_logits and return_probs are not yet supported for vLLM backend. "
+                "Please use HuggingFace backend for this functionality."
+            )
+        
         # Generate
         outputs = self.model.generate(prompts, sampling_params)
         

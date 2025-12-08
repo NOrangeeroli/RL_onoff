@@ -1,9 +1,9 @@
-"""Built-in metrics for evaluating model outputs."""
+"""Built-in rewards for evaluating model outputs."""
 
 from typing import Union, List, Dict, Optional
 import numpy as np
 
-from rl_onoff.metrics.base import BaseMetric
+from rl_onoff.tasks.rewards.base import BaseMetric
 
 try:
     from rouge_score import rouge_scorer
@@ -22,6 +22,18 @@ try:
         BLEU_AVAILABLE = False
 except ImportError:
     BLEU_AVAILABLE = False
+
+try:
+    from math_verify import verify
+    MATH_VERIFY_AVAILABLE = True
+except ImportError:
+    MATH_VERIFY_AVAILABLE = False
+
+try:
+    from math_verify import verify
+    MATH_VERIFY_AVAILABLE = True
+except ImportError:
+    MATH_VERIFY_AVAILABLE = False
 
 
 class PerplexityMetric(BaseMetric):
@@ -271,3 +283,153 @@ class ExactMatchMetric(BaseMetric):
 
         return scores[0] if is_single else scores
 
+
+
+class MathVerifyMetric(BaseMetric):
+    """Compute math verification score using math_verify library.
+    
+    Extracts the final answer from the solution text and verifies
+    if it's mathematically equivalent to the reference answer.
+    """
+
+    def __init__(self):
+        """Initialize math verify metric."""
+        super().__init__("math_verify")
+        if not MATH_VERIFY_AVAILABLE:
+            raise ImportError(
+                "math_verify is not installed. Install it with: pip install math-verify"
+            )
+
+    def _extract_answer(self, text: str) -> Optional[str]:
+        """Extract the final answer from solution text.
+        
+        This method looks for common patterns like:
+        - "The answer is X"
+        - "Answer: X"
+        - "X" (if text is just a number/expression)
+        - Boxed answers: "\\boxed{X}"
+        - Final line containing a number/expression
+        
+        Args:
+            text: Solution text
+            
+        Returns:
+            Extracted answer string or None if not found
+        """
+        import re
+        
+        # Remove extra whitespace
+        text = text.strip()
+        
+        # Try to find boxed answer: \boxed{...} or \boxed ...
+        boxed_pattern = r'\\boxed\{([^}]+)\}'
+        match = re.search(boxed_pattern, text)
+        if match:
+            return match.group(1).strip()
+        
+        # Try patterns like "The answer is X" or "Answer: X"
+        answer_patterns = [
+            r'(?:the\s+)?answer\s+is\s*:?\s*([^\n\.]+)',
+            r'answer\s*:?\s*([^\n\.]+)',
+            r'final\s+answer\s*:?\s*([^\n\.]+)',
+            r'solution\s*:?\s*([^\n\.]+)',
+        ]
+        
+        for pattern in answer_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                answer = match.group(1).strip()
+                # Remove trailing punctuation
+                answer = answer.rstrip('.,;!?')
+                if answer:
+                    return answer
+        
+        # Try to find the last number or mathematical expression
+        # Look for patterns like numbers, fractions, expressions
+        number_patterns = [
+            r'(-?\d+\.?\d*)',  # Simple number
+            r'(-?\d+/\d+)',  # Fraction
+            r'(-?\d+\s*[+\-*/]\s*\d+)',  # Simple expression
+        ]
+        
+        # Get the last few lines
+        lines = text.split('\n')
+        for line in reversed(lines[-5:]):  # Check last 5 lines
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Check if line looks like an answer (contains numbers)
+            for pattern in number_patterns:
+                matches = re.findall(pattern, line)
+                if matches:
+                    # Return the last match
+                    return matches[-1]
+        
+        # If nothing found, try to return the last non-empty line
+        for line in reversed(lines):
+            line = line.strip()
+            if line and not line.startswith('#'):
+                return line
+        
+        return None
+
+    def compute(
+        self,
+        predictions: Union[str, List[str]],
+        references: Union[str, List[str], List[List[str]]],
+        **kwargs
+    ) -> Union[float, List[float]]:
+        """Compute math verification score.
+        
+        Args:
+            predictions: Predicted solution text(s)
+            references: Reference answer(s) or list of reference lists
+            **kwargs: Additional arguments
+            
+        Returns:
+            Math verification score(s) (1.0 if equivalent, 0.0 otherwise)
+        """
+        if not MATH_VERIFY_AVAILABLE:
+            raise ImportError(
+                "math_verify is not installed. Install it with: pip install math-verify"
+            )
+        
+        is_single = isinstance(predictions, str)
+        if is_single:
+            predictions = [predictions]
+        
+        # Normalize references format
+        if isinstance(references, str):
+            references = [[references]]
+        elif isinstance(references, list) and len(references) > 0:
+            if isinstance(references[0], str):
+                references = [[ref] for ref in references]
+        
+        scores = []
+        
+        for pred, refs in zip(predictions, references):
+            # Extract answer from prediction
+            pred_answer = self._extract_answer(pred)
+            
+            if pred_answer is None:
+                # If we can't extract an answer, score is 0
+                scores.append(0.0)
+                continue
+            
+            # Try to verify against each reference answer
+            verified = False
+            for ref in refs:
+                try:
+                    # Use math_verify to check equivalence
+                    result = verify(pred_answer, ref)
+                    if result:
+                        verified = True
+                        break
+                except Exception as e:
+                    # If verification fails, continue to next reference
+                    continue
+            
+            scores.append(1.0 if verified else 0.0)
+        
+        return scores[0] if is_single else scores

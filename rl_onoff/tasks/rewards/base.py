@@ -1,4 +1,4 @@
-"""Base metric interface for extensible metrics framework."""
+"""Base reward interface for extensible rewards framework."""
 
 from abc import ABC, abstractmethod
 from typing import Dict, List, Any, Optional, Union

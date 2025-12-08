@@ -1,6 +1,6 @@
 """HuggingFace Transformers backend implementation."""
 
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional, Union, Any
 import numpy as np
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -82,8 +82,10 @@ class HuggingFaceBackend(BaseBackend):
         top_k: Optional[int] = None,
         top_p: Optional[float] = None,
         do_sample: bool = True,
+        return_logits: bool = False,
+        return_probs: bool = False,
         **kwargs
-    ) -> Union[str, List[str]]:
+    ) -> Union[str, List[str], Dict[str, Any], List[Dict[str, Any]]]:
         """Generate text from prompts."""
         if not self._is_loaded:
             self.load()
@@ -108,6 +110,11 @@ class HuggingFaceBackend(BaseBackend):
             **kwargs
         }
         
+        # Request scores (logits) if needed
+        if return_logits or return_probs:
+            gen_kwargs["return_dict_in_generate"] = True
+            gen_kwargs["output_scores"] = True
+        
         if do_sample:
             gen_kwargs["temperature"] = temperature
             if top_k is not None:
@@ -117,14 +124,50 @@ class HuggingFaceBackend(BaseBackend):
 
         # Generate
         with torch.no_grad():
-            outputs = self.model.generate(**inputs, **gen_kwargs)
+            if return_logits or return_probs:
+                outputs = self.model.generate(**inputs, **gen_kwargs)
+                # outputs is a GenerateDecoderOnlyOutput object
+                generated_ids = outputs.sequences
+                scores = outputs.scores  # List of tensors, one per generated token
+            else:
+                outputs = self.model.generate(**inputs, **gen_kwargs)
+                generated_ids = outputs
 
         # Decode outputs (remove input tokens)
         input_lengths = inputs["input_ids"].shape[1]
-        generated_ids = outputs[:, input_lengths:]
-        texts = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+        generated_token_ids = generated_ids[:, input_lengths:]
+        texts = self.tokenizer.batch_decode(generated_token_ids, skip_special_tokens=True)
 
-        return texts[0] if is_single else texts
+        # If not returning logits/probs, return texts as before
+        if not return_logits and not return_probs:
+            return texts[0] if is_single else texts
+
+        # Prepare results with logits/probs
+        results = []
+        for i, text in enumerate(texts):
+            result = {"text": text}
+            
+            if return_logits or return_probs:
+                # Stack scores: (num_tokens, batch_size, vocab_size) -> (batch_size, num_tokens, vocab_size)
+                if scores:
+                    # scores is a tuple of tensors, one per generated token position
+                    # Each tensor has shape (batch_size, vocab_size)
+                    batch_logits = torch.stack(scores, dim=1)  # (batch_size, num_tokens, vocab_size)
+                    logits_array = batch_logits[i].cpu().numpy()  # (num_tokens, vocab_size)
+                    
+                    if return_logits:
+                        result["logits"] = logits_array
+                    
+                    if return_probs:
+                        # Convert logits to probabilities
+                        scaled_logits = logits_array / temperature
+                        exp_logits = np.exp(scaled_logits - np.max(scaled_logits, axis=-1, keepdims=True))
+                        probs_array = exp_logits / np.sum(exp_logits, axis=-1, keepdims=True)
+                        result["probs"] = probs_array
+            
+            results.append(result)
+
+        return results[0] if is_single else results
 
     def get_logits(
         self,
