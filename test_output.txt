@@ -1,7 +1,7 @@
 Test Execution Report
 ====================
-Command: pytest tests/utils/test_data_loader.py -v
-Date: Mon Dec  8 07:02:44 CET 2025
+Command: pytest tests/backends/ -v
+Date: Mon Dec  8 07:18:01 CET 2025
 Working Directory: /lustre/fast/fast/txiao/ym/rl_onoff
 
 Output:
@@ -11,25 +11,147 @@ platform linux -- Python 3.10.19, pytest-9.0.2, pluggy-1.6.0 -- /fast/txiao/cond
 cachedir: .pytest_cache
 rootdir: /lustre/fast/fast/txiao/ym/rl_onoff
 plugins: anyio-4.4.0, typeguard-4.3.0, cov-7.0.0
-collecting ... collected 18 items
+collecting ... collected 44 items
 
-tests/utils/test_data_loader.py::TestDataLoader::test_load_json PASSED   [  5%]
-tests/utils/test_data_loader.py::TestDataLoader::test_load_jsonl PASSED  [ 11%]
-tests/utils/test_data_loader.py::TestDataLoader::test_load_csv PASSED    [ 16%]
-tests/utils/test_data_loader.py::TestDataLoader::test_load_csv_preserves_columns PASSED [ 22%]
-tests/utils/test_data_loader.py::TestDataLoader::test_load_data_auto_detect_json PASSED [ 27%]
-tests/utils/test_data_loader.py::TestDataLoader::test_load_data_auto_detect_jsonl PASSED [ 33%]
-tests/utils/test_data_loader.py::TestDataLoader::test_load_data_auto_detect_csv PASSED [ 38%]
-tests/utils/test_data_loader.py::TestDataLoader::test_load_parquet PASSED [ 44%]
-tests/utils/test_data_loader.py::TestDataLoader::test_load_parquet_preserves_columns PASSED [ 50%]
-tests/utils/test_data_loader.py::TestDataLoader::test_load_data_auto_detect_parquet PASSED [ 55%]
-tests/utils/test_data_loader.py::TestDataLoader::test_load_data_file_not_found PASSED [ 61%]
-tests/utils/test_data_loader.py::TestDataLoader::test_load_data_unsupported_format PASSED [ 66%]
-tests/utils/test_data_loader.py::TestDataLoader::test_load_huggingface_dataset_real_aime_2024 SKIPPED [ 72%]
-tests/utils/test_data_loader.py::TestDataLoader::test_load_huggingface_dataset_real_aime_with_limit PASSED [ 77%]
-tests/utils/test_data_loader.py::TestDataLoader::test_load_real_parquet_files PASSED [ 83%]
-tests/utils/test_data_loader.py::TestDataLoader::test_load_real_parquet_gsm8k PASSED [ 88%]
-tests/utils/test_data_loader.py::TestDataLoader::test_load_real_parquet_math PASSED [ 94%]
-tests/utils/test_data_loader.py::TestDataLoader::test_load_real_parquet_preserves_all_columns PASSED [100%]
+tests/backends/test_base.py::TestBaseBackend::test_init PASSED           [  2%]
+tests/backends/test_base.py::TestBaseBackend::test_is_loaded PASSED      [  4%]
+tests/backends/test_base.py::TestBaseBackend::test_encode_decode FAILED  [  6%]
+tests/backends/test_base.py::TestBaseBackend::test_get_probabilities PASSED [  9%]
+tests/backends/test_base.py::TestBaseBackend::test_get_probabilities_with_temperature PASSED [ 11%]
+tests/backends/test_base.py::TestBaseBackend::test_repr PASSED           [ 13%]
+tests/backends/test_base.py::TestBaseBackend::test_abstract_methods PASSED [ 15%]
+tests/backends/test_huggingface.py::TestHuggingFaceBackend::test_init PASSED [ 18%]
+tests/backends/test_huggingface.py::TestHuggingFaceBackend::test_init_with_device PASSED [ 20%]
+tests/backends/test_huggingface.py::TestHuggingFaceBackend::test_load PASSED [ 22%]
+tests/backends/test_huggingface.py::TestHuggingFaceBackend::test_load_idempotent PASSED [ 25%]
+tests/backends/test_huggingface.py::TestHuggingFaceBackend::test_generate_single PASSED [ 27%]
+tests/backends/test_huggingface.py::TestHuggingFaceBackend::test_generate_multiple PASSED [ 29%]
+tests/backends/test_huggingface.py::TestHuggingFaceBackend::test_generate_with_sampling_params PASSED [ 31%]
+tests/backends/test_huggingface.py::TestHuggingFaceBackend::test_get_logits_single PASSED [ 34%]
+tests/backends/test_huggingface.py::TestHuggingFaceBackend::test_get_logits_multiple PASSED [ 36%]
+tests/backends/test_huggingface.py::TestHuggingFaceBackend::test_get_tokenizer PASSED [ 38%]
+tests/backends/test_huggingface.py::TestHuggingFaceBackend::test_encode_decode PASSED [ 40%]
+tests/backends/test_init.py::TestGetBackend::test_get_backend_huggingface PASSED [ 43%]
+tests/backends/test_init.py::TestGetBackend::test_get_backend_huggingface_case_insensitive PASSED [ 45%]
+tests/backends/test_init.py::TestGetBackend::test_get_backend_vllm PASSED [ 47%]
+tests/backends/test_init.py::TestGetBackend::test_get_backend_sglang PASSED [ 50%]
+tests/backends/test_init.py::TestGetBackend::test_get_backend_invalid PASSED [ 52%]
+tests/backends/test_init.py::TestGetBackend::test_get_backend_passes_kwargs PASSED [ 54%]
+tests/backends/test_init.py::TestGetBackend::test_backend_exports PASSED [ 56%]
+tests/backends/test_sglang.py::TestSGLangBackend::test_init_without_sglang PASSED [ 59%]
+tests/backends/test_sglang.py::TestSGLangBackend::test_init FAILED       [ 61%]
+tests/backends/test_sglang.py::TestSGLangBackend::test_load PASSED       [ 63%]
+tests/backends/test_sglang.py::TestSGLangBackend::test_load_idempotent PASSED [ 65%]
+tests/backends/test_sglang.py::TestSGLangBackend::test_generate_single PASSED [ 68%]
+tests/backends/test_sglang.py::TestSGLangBackend::test_generate_multiple PASSED [ 70%]
+tests/backends/test_sglang.py::TestSGLangBackend::test_generate_with_sampling_params PASSED [ 72%]
+tests/backends/test_sglang.py::TestSGLangBackend::test_get_logits_not_implemented PASSED [ 75%]
+tests/backends/test_sglang.py::TestSGLangBackend::test_get_tokenizer PASSED [ 77%]
+tests/backends/test_vllm.py::TestVLLMBackend::test_init_without_vllm PASSED [ 79%]
+tests/backends/test_vllm.py::TestVLLMBackend::test_init PASSED           [ 81%]
+tests/backends/test_vllm.py::TestVLLMBackend::test_load PASSED           [ 84%]
+tests/backends/test_vllm.py::TestVLLMBackend::test_load_idempotent PASSED [ 86%]
+tests/backends/test_vllm.py::TestVLLMBackend::test_generate_single PASSED [ 88%]
+tests/backends/test_vllm.py::TestVLLMBackend::test_generate_multiple PASSED [ 90%]
+tests/backends/test_vllm.py::TestVLLMBackend::test_generate_with_sampling_params PASSED [ 93%]
+tests/backends/test_vllm.py::TestVLLMBackend::test_get_logits_not_implemented PASSED [ 95%]
+tests/backends/test_vllm.py::TestVLLMBackend::test_get_tokenizer PASSED  [ 97%]
+tests/backends/test_vllm.py::TestVLLMBackend::test_get_tokenizer_no_engine FAILED [100%]
 
-======================== 17 passed, 1 skipped in 22.86s ========================
+=================================== FAILURES ===================================
+______________________ TestBaseBackend.test_encode_decode ______________________
+
+self = <tests.backends.test_base.TestBaseBackend object at 0x14d465242da0>
+
+    def test_encode_decode(self):
+        """Test encode and decode methods."""
+        backend = ConcreteBackend(model_name="test_model")
+    
+        # Mock tokenizer with encode/decode methods
+        class MockTokenizer:
+            def encode(self, text, add_special_tokens=False):
+                return [1, 2, 3] if isinstance(text, str) else [[1, 2], [3, 4]]
+    
+            def decode(self, token_ids, skip_special_tokens=True):
+                if isinstance(token_ids[0], int):
+                    return "decoded_text"
+                return ["decoded_text"] * len(token_ids)
+    
+        backend.tokenizer = MockTokenizer()
+        backend._is_loaded = True
+    
+        # Test encode
+        result = backend.encode("test")
+        assert result == [1, 2, 3]
+    
+        result = backend.encode(["test1", "test2"])
+>       assert result == [[1, 2], [3, 4]]
+E       AssertionError: assert [[1, 2, 3], [1, 2, 3]] == [[1, 2], [3, 4]]
+E         
+E         At index 0 diff: [1, 2, 3] != [1, 2]
+E         
+E         Full diff:
+E           [
+E               [
+E                   1,...
+E         
+E         ...Full output truncated (10 lines hidden), use '-vv' to show
+
+tests/backends/test_base.py:79: AssertionError
+_________________________ TestSGLangBackend.test_init __________________________
+
+self = <tests.backends.test_sglang.TestSGLangBackend object at 0x14d464f77ee0>
+
+    @pytest.mark.skipif(not SGLANG_AVAILABLE, reason="SGLang not available")
+    def test_init(self):
+        """Test SGLang backend initialization."""
+        backend = SGLangBackend(
+            model_name="test_model",
+            tp_size=1,
+            mem_fraction_static=0.85
+        )
+        assert backend.model_name == "test_model"
+>       assert backend.runtime is None
+E       AttributeError: 'SGLangBackend' object has no attribute 'runtime'
+
+tests/backends/test_sglang.py:27: AttributeError
+_________________ TestVLLMBackend.test_get_tokenizer_no_engine _________________
+
+self = <tests.backends.test_vllm.TestVLLMBackend object at 0x14d465091f60>
+mock_llm_class = <MagicMock name='LLM' id='22902461114944'>
+
+    @pytest.mark.skipif(not VLLM_AVAILABLE, reason="vLLM not available")
+    @patch('rl_onoff.backends.vllm.LLM')
+    def test_get_tokenizer_no_engine(self, mock_llm_class):
+        """Test get_tokenizer when llm_engine is not available."""
+        mock_llm = MagicMock()
+        mock_llm.llm_engine = None
+        mock_llm_class.return_value = mock_llm
+    
+        backend = VLLMBackend(model_name="test_model")
+        backend.load()
+    
+>       tokenizer = backend.get_tokenizer()
+
+tests/backends/test_vllm.py:177: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = VLLMBackend(model_name=test_model)
+
+    def get_tokenizer(self):
+        """Get the tokenizer instance."""
+        if not self._is_loaded:
+            self.load()
+    
+        # vLLM models have a tokenizer attribute
+>       return self.model.llm_engine.tokenizer.tokenizer if hasattr(
+            self.model, "llm_engine"
+        ) else None
+E       AttributeError: 'NoneType' object has no attribute 'tokenizer'
+
+rl_onoff/backends/vllm.py:133: AttributeError
+=========================== short test summary info ============================
+FAILED tests/backends/test_base.py::TestBaseBackend::test_encode_decode - Ass...
+FAILED tests/backends/test_sglang.py::TestSGLangBackend::test_init - Attribut...
+FAILED tests/backends/test_vllm.py::TestVLLMBackend::test_get_tokenizer_no_engine
+======================== 3 failed, 41 passed in 19.87s =========================
