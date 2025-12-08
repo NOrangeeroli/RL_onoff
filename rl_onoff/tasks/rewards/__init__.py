@@ -1,21 +1,21 @@
 """Rewards framework for evaluating model outputs."""
 
-from rl_onoff.tasks.rewards.base import BaseMetric, MetricRegistry
+from rl_onoff.tasks.rewards.base import BaseReward, RewardRegistry
 from rl_onoff.tasks.rewards.builtin import (
-    PerplexityMetric,
-    BLEUMetric,
-    ROUGEMetric,
-    ExactMatchMetric,
-    MathVerifyMetric,
+    PerplexityReward,
+    BLEUReward,
+    ROUGEReward,
+    ExactMatchReward,
+    MathVerifyReward,
 )
 
 __all__ = [
-    "BaseMetric",
-    "MetricRegistry",
-    "PerplexityMetric",
-    "BLEUMetric",
-    "ROUGEMetric",
-    "ExactMatchMetric",
-    "MathVerifyMetric",
+    "BaseReward",
+    "RewardRegistry",
+    "PerplexityReward",
+    "BLEUReward",
+    "ROUGEReward",
+    "ExactMatchReward",
+    "MathVerifyReward",
 ]
 

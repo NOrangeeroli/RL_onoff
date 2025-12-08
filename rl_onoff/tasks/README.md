@@ -1,12 +1,12 @@
 # Tasks Module
 
-The tasks module provides a framework for defining task-specific prompt templates and metrics.
+The tasks module provides a framework for defining task-specific prompt templates and rewards.
 
 ## Overview
 
 Each task combines:
 - **Prompt Template**: Formats questions into prompts for the model
-- **Metric**: Evaluates model responses against reference answers
+- **Reward**: Evaluates model responses against reference answers
 
 ## Usage Example
 
@@ -54,11 +54,11 @@ To create a new task, inherit from `BaseTask`:
 
 ```python
 from rl_onoff.tasks.base import BaseTask
-from rl_onoff.tasks.rewards.builtin import ExactMatchMetric
+from rl_onoff.tasks.rewards.builtin import ExactMatchReward
 
 class MyTask(BaseTask):
-    def _create_metric(self):
-        return ExactMatchMetric()
+    def _create_reward(self):
+        return ExactMatchReward()
     
     def get_prompt_template(self):
         return "Question: $question\nAnswer:"

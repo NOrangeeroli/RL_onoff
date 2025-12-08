@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI script for sampling from models and calculating metrics."""
+"""CLI script for sampling from models and calculating rewards."""
 
 import click
 import json
@@ -9,12 +9,12 @@ from tqdm import tqdm
 
 from rl_onoff.backends import get_backend
 from rl_onoff.sampling import Sampler, SamplingConfig
-from rl_onoff.tasks.rewards import MetricRegistry
+from rl_onoff.tasks.rewards import RewardRegistry
 from rl_onoff.tasks.rewards.builtin import (
-    PerplexityMetric,
-    BLEUMetric,
-    ROUGEMetric,
-    ExactMatchMetric,
+    PerplexityReward,
+    BLEUReward,
+    ROUGEReward,
+    ExactMatchReward,
 )
 from rl_onoff.utils.data_loader import load_data
 
@@ -32,7 +32,7 @@ from rl_onoff.utils.data_loader import load_data
 @click.option('--top-k', default=None, type=int, help='Top-k sampling parameter')
 @click.option('--top-p', default=None, type=float, help='Top-p sampling parameter')
 @click.option('--num-samples', default=1, type=int, help='Number of samples per prompt')
-@click.option('--metrics', default='all', help='Comma-separated list of metrics or "all"')
+@click.option('--metrics', default='all', help='Comma-separated list of rewards or "all"')
 @click.option('--batch-size', default=None, type=int, help='Batch size for processing')
 def main(
     backend_type: str,
@@ -49,7 +49,7 @@ def main(
     metrics: str,
     batch_size: int,
 ):
-    """Sample from a model and calculate metrics on the responses."""
+    """Sample from a model and calculate rewards on the responses."""
     
     # Load dataset
     click.echo(f"Loading dataset from {dataset}...")
@@ -76,26 +76,26 @@ def main(
         num_samples=num_samples,
     )
     
-    # Initialize metrics
-    metric_registry = MetricRegistry()
+    # Initialize rewards
+    reward_registry = RewardRegistry()
     
-    # Register built-in metrics
+    # Register built-in rewards
     if backend_type == 'huggingface':
-        metric_registry.register(PerplexityMetric(backend=backend))
+        reward_registry.register(PerplexityReward(backend=backend))
     
     try:
-        metric_registry.register(BLEUMetric())
-        metric_registry.register(ROUGEMetric())
+        reward_registry.register(BLEUReward())
+        reward_registry.register(ROUGEReward())
     except ImportError as e:
-        click.echo(f"Warning: Some metrics unavailable: {e}")
+        click.echo(f"Warning: Some rewards unavailable: {e}")
     
-    metric_registry.register(ExactMatchMetric())
+    reward_registry.register(ExactMatchReward())
     
-    # Determine which metrics to compute
+    # Determine which rewards to compute
     if metrics.lower() == 'all':
-        metric_names = None
+        reward_names = None
     else:
-        metric_names = [m.strip() for m in metrics.split(',')]
+        reward_names = [m.strip() for m in metrics.split(',')]
     
     # Generate samples
     click.echo("Generating samples...")
@@ -110,7 +110,7 @@ def main(
     
     # Handle multiple samples
     if num_samples > 1:
-        # Flatten predictions for metric computation
+        # Flatten predictions for reward computation
         flat_predictions = []
         flat_references = []
         for pred_list, ref in zip(predictions, references):
@@ -121,12 +121,12 @@ def main(
         flat_predictions = predictions
         flat_references = references
     
-    # Calculate metrics
-    click.echo("Calculating metrics...")
-    metric_results = metric_registry.compute_all(
+    # Calculate rewards
+    click.echo("Calculating rewards...")
+    reward_results = reward_registry.compute_all(
         flat_predictions,
         flat_references,
-        metric_names=metric_names,
+        reward_names=reward_names,
     )
     
     # Prepare output
@@ -134,7 +134,7 @@ def main(
         'model': model_name,
         'backend': backend_type,
         'num_samples': num_samples,
-        'metric_results': metric_results,
+        'reward_results': reward_results,
         'examples': [],
     }
     
@@ -152,12 +152,12 @@ def main(
         json.dump(output_data, f, indent=2, ensure_ascii=False)
     
     click.echo(f"Results saved to {output}")
-    click.echo(f"\nMetric Summary:")
-    for metric_name, metric_value in metric_results.items():
-        if isinstance(metric_value, dict) and 'error' in metric_value:
-            click.echo(f"  {metric_name}: Error - {metric_value['error']}")
+    click.echo(f"\nReward Summary:")
+    for reward_name, reward_value in reward_results.items():
+        if isinstance(reward_value, dict) and 'error' in reward_value:
+            click.echo(f"  {reward_name}: Error - {reward_value['error']}")
         else:
-            click.echo(f"  {metric_name}: {metric_value}")
+            click.echo(f"  {reward_name}: {reward_value}")
 
 
 if __name__ == '__main__':

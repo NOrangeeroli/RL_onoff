@@ -3,7 +3,7 @@
 from typing import Union, List, Dict, Optional
 import numpy as np
 
-from rl_onoff.tasks.rewards.base import BaseMetric
+from rl_onoff.tasks.rewards.base import BaseReward
 
 try:
     from rouge_score import rouge_scorer
@@ -29,18 +29,12 @@ try:
 except ImportError:
     MATH_VERIFY_AVAILABLE = False
 
-try:
-    from math_verify import verify
-    MATH_VERIFY_AVAILABLE = True
-except ImportError:
-    MATH_VERIFY_AVAILABLE = False
 
-
-class PerplexityMetric(BaseMetric):
+class PerplexityReward(BaseReward):
     """Compute perplexity of generated text."""
 
     def __init__(self, backend=None):
-        """Initialize perplexity metric.
+        """Initialize perplexity reward.
         
         Args:
             backend: Backend instance for computing log probabilities
@@ -111,11 +105,11 @@ class PerplexityMetric(BaseMetric):
         return perplexities[0] if is_single else perplexities
 
 
-class BLEUMetric(BaseMetric):
+class BLEUReward(BaseReward):
     """Compute BLEU score."""
 
     def __init__(self, n_gram: int = 4):
-        """Initialize BLEU metric.
+        """Initialize BLEU reward.
         
         Args:
             n_gram: N-gram order for BLEU computation
@@ -170,11 +164,11 @@ class BLEUMetric(BaseMetric):
         return scores[0] if is_single else scores
 
 
-class ROUGEMetric(BaseMetric):
+class ROUGEReward(BaseReward):
     """Compute ROUGE scores."""
 
     def __init__(self, rouge_types: List[str] = None):
-        """Initialize ROUGE metric.
+        """Initialize ROUGE reward.
         
         Args:
             rouge_types: List of ROUGE types to compute (default: ['rouge1', 'rouge2', 'rougeL'])
@@ -229,11 +223,11 @@ class ROUGEMetric(BaseMetric):
         return all_scores[0] if is_single else all_scores
 
 
-class ExactMatchMetric(BaseMetric):
+class ExactMatchReward(BaseReward):
     """Compute exact match score."""
 
     def __init__(self, normalize: bool = True):
-        """Initialize exact match metric.
+        """Initialize exact match reward.
         
         Args:
             normalize: Whether to normalize text (lowercase, strip whitespace)
@@ -285,7 +279,7 @@ class ExactMatchMetric(BaseMetric):
 
 
 
-class MathVerifyMetric(BaseMetric):
+class MathVerifyReward(BaseReward):
     """Compute math verification score using math_verify library.
     
     Extracts the final answer from the solution text and verifies
@@ -293,7 +287,7 @@ class MathVerifyMetric(BaseMetric):
     """
 
     def __init__(self):
-        """Initialize math verify metric."""
+        """Initialize math verify reward."""
         super().__init__("math_verify")
         if not MATH_VERIFY_AVAILABLE:
             raise ImportError(

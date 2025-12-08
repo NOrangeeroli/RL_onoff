@@ -5,7 +5,7 @@ A flexible Python framework for sampling from LLM models, calculating metrics, e
 ## Features
 
 1. **Multi-Backend Support**: Works with HuggingFace Transformers, vLLM, and SGLang backends
-2. **Sampling & Metrics**: Sample from models and calculate various metrics (perplexity, BLEU, ROUGE, exact match, and custom metrics)
+2. **Sampling & Rewards**: Sample from models and calculate various rewards (perplexity, BLEU, ROUGE, exact match, and custom rewards)
 3. **Distribution Extraction**: Extract token-wise probability distributions from models for given question-solution pairs
 4. **Divergence Calculation**: Compute token-level KL and Jensen-Shannon divergences between model distributions
 5. **Conditional Model Switching**: Generate responses with automatic switching between models when divergence exceeds thresholds
@@ -23,7 +23,7 @@ pip install -r requirements.txt
 
 ## Quick Start
 
-### 1. Sample from a Model and Calculate Metrics
+### 1. Sample from a Model and Calculate Rewards
 
 ```bash
 python scripts/sample_and_metrics.py \
@@ -89,12 +89,12 @@ backend.load()
 response = backend.generate("Hello, world!", max_new_tokens=50)
 ```
 
-#### Sampling and Metrics
+#### Sampling and Rewards
 
 ```python
 from rl_onoff.sampling import Sampler, SamplingConfig
-from rl_onoff.tasks.rewards import MetricRegistry
-from rl_onoff.tasks.rewards.builtin import BLEUMetric, ROUGEMetric
+from rl_onoff.tasks.rewards import RewardRegistry
+from rl_onoff.tasks.rewards.builtin import BLEUReward, ROUGEReward
 
 # Initialize sampler
 sampler = Sampler(backend)
@@ -107,10 +107,10 @@ config = SamplingConfig(
 # Generate samples
 predictions = sampler.sample("What is AI?", config=config)
 
-# Calculate metrics
-registry = MetricRegistry()
-registry.register(BLEUMetric())
-registry.register(ROUGEMetric())
+# Calculate rewards
+registry = RewardRegistry()
+registry.register(BLEUReward())
+registry.register(ROUGEReward())
 
 results = registry.compute_all(
     predictions=["AI is artificial intelligence."],
@@ -237,15 +237,15 @@ All backends implement a common interface:
 - `get_probabilities()` - Get token probabilities
 - `get_tokenizer()` - Get tokenizer instance
 
-### Metrics Framework
+### Rewards Framework
 
-Extensible metric system with built-in metrics:
+Extensible reward system with built-in rewards:
 - Perplexity
 - BLEU
 - ROUGE (ROUGE-1, ROUGE-2, ROUGE-L)
 - Exact Match
 
-Custom metrics can be added by extending `BaseMetric`.
+Custom rewards can be added by extending `BaseReward`.
 
 ### Distribution Extraction
 

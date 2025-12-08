@@ -5,14 +5,14 @@ from typing import Dict, List, Any, Optional, Union
 import numpy as np
 
 
-class BaseMetric(ABC):
-    """Abstract base class for all metrics."""
+class BaseReward(ABC):
+    """Abstract base class for all rewards."""
 
     def __init__(self, name: Optional[str] = None):
-        """Initialize metric.
+        """Initialize reward.
         
         Args:
-            name: Metric name (defaults to class name)
+            name: Reward name (defaults to class name)
         """
         self.name = name or self.__class__.__name__
 
@@ -23,7 +23,7 @@ class BaseMetric(ABC):
         references: Union[str, List[str], List[List[str]]],
         **kwargs
     ) -> Union[float, Dict[str, float]]:
-        """Compute metric value(s).
+        """Compute reward value(s).
         
         Args:
             predictions: Predicted text(s)
@@ -31,90 +31,90 @@ class BaseMetric(ABC):
             **kwargs: Additional arguments
             
         Returns:
-            Metric value(s) as float or dict of metric values
+            Reward value(s) as float or dict of reward values
         """
         pass
 
     def __call__(self, *args, **kwargs):
-        """Allow metric to be called directly."""
+        """Allow reward to be called directly."""
         return self.compute(*args, **kwargs)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name})"
 
 
-class MetricRegistry:
-    """Registry for managing metrics."""
+class RewardRegistry:
+    """Registry for managing rewards."""
 
     def __init__(self):
         """Initialize registry."""
-        self._metrics: Dict[str, BaseMetric] = {}
+        self._rewards: Dict[str, BaseReward] = {}
 
-    def register(self, metric: BaseMetric, name: Optional[str] = None):
-        """Register a metric.
+    def register(self, reward: BaseReward, name: Optional[str] = None):
+        """Register a reward.
         
         Args:
-            metric: Metric instance to register
+            reward: Reward instance to register
             name: Optional name override
         """
-        metric_name = name or metric.name
-        self._metrics[metric_name] = metric
+        reward_name = name or reward.name
+        self._rewards[reward_name] = reward
 
-    def get(self, name: str) -> BaseMetric:
-        """Get a metric by name.
+    def get(self, name: str) -> BaseReward:
+        """Get a reward by name.
         
         Args:
-            name: Metric name
+            name: Reward name
             
         Returns:
-            Metric instance
+            Reward instance
             
         Raises:
-            KeyError: If metric not found
+            KeyError: If reward not found
         """
-        if name not in self._metrics:
-            raise KeyError(f"Metric '{name}' not found. Available: {list(self._metrics.keys())}")
-        return self._metrics[name]
+        if name not in self._rewards:
+            raise KeyError(f"Reward '{name}' not found. Available: {list(self._rewards.keys())}")
+        return self._rewards[name]
 
     def compute_all(
         self,
         predictions: Union[str, List[str]],
         references: Union[str, List[str], List[List[str]]],
-        metric_names: Optional[List[str]] = None,
+        reward_names: Optional[List[str]] = None,
         **kwargs
     ) -> Dict[str, Union[float, Dict[str, float]]]:
-        """Compute all registered metrics or a subset.
+        """Compute all registered rewards or a subset.
         
         Args:
             predictions: Predicted text(s)
             references: Reference text(s)
-            metric_names: Optional list of metric names to compute (all if None)
-            **kwargs: Additional arguments passed to metrics
+            reward_names: Optional list of reward names to compute (all if None)
+            **kwargs: Additional arguments passed to rewards
             
         Returns:
-            Dictionary mapping metric names to their values
+            Dictionary mapping reward names to their values
         """
-        metrics_to_compute = metric_names or list(self._metrics.keys())
+        rewards_to_compute = reward_names or list(self._rewards.keys())
         results = {}
         
-        for name in metrics_to_compute:
-            metric = self.get(name)
+        for name in rewards_to_compute:
+            reward = self.get(name)
             try:
-                results[name] = metric.compute(predictions, references, **kwargs)
+                results[name] = reward.compute(predictions, references, **kwargs)
             except Exception as e:
                 results[name] = {"error": str(e)}
         
         return results
 
-    def list_metrics(self) -> List[str]:
-        """List all registered metric names.
+    def list_rewards(self) -> List[str]:
+        """List all registered reward names.
         
         Returns:
-            List of metric names
+            List of reward names
         """
-        return list(self._metrics.keys())
+        return list(self._rewards.keys())
 
     def clear(self):
-        """Clear all registered metrics."""
-        self._metrics.clear()
+        """Clear all registered rewards."""
+        self._rewards.clear()
 
