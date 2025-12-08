@@ -112,22 +112,4 @@ class TestMathVerifyReward:
             with pytest.raises(ImportError, match="math_verify is not installed"):
                 reward = builtin.MathVerifyReward()
     
-    def test_extract_answer_from_text(self):
-        """Test _extract_answer method."""
-        try:
-            reward = builtin.MathVerifyReward()
-            
-            # Test with boxed answer
-            answer = reward._extract_answer("The solution is \\boxed{42}")
-            assert answer == "42"
-            
-            # Test with "answer is" pattern
-            answer = reward._extract_answer("The answer is 42")
-            assert answer == "42"
-            
-            # Test with "Answer:" pattern
-            answer = reward._extract_answer("Answer: 42")
-            assert answer == "42"
-        except ImportError:
-            pytest.skip("MathVerifyReward not available")
 

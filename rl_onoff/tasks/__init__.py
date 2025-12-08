@@ -2,6 +2,7 @@
 
 from rl_onoff.tasks.base import BaseTask
 from rl_onoff.tasks.math import MathTask
+from rl_onoff.tasks.config import TaskConfig
 from rl_onoff.tasks.formats import (
     BaseFormat,
     BoxedFormat,
@@ -18,6 +19,7 @@ from rl_onoff.tasks.chat_templates import (
 __all__ = [
     "BaseTask",
     "MathTask",
+    "TaskConfig",
     "BaseFormat",
     "BoxedFormat",
     "StructuredFormat",

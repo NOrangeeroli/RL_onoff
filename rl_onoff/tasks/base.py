@@ -1,69 +1,60 @@
 """Base task interface for task-specific prompt templates and rewards."""
 
-from abc import ABC, abstractmethod
-from typing import Union, List, Dict, Any, Optional, Tuple
+from typing import Union, List, Dict, Any, Optional
 from string import Template
+from pathlib import Path
 
 from rl_onoff.tasks.rewards.base import BaseReward
 from rl_onoff.tasks.formats.base import BaseFormat
+from rl_onoff.tasks.config import TaskConfig
+from rl_onoff.tasks.chat_templates import create_chat_template
+from rl_onoff.tasks.formats import create_format
+from rl_onoff.tasks.rewards import create_reward
 
 
-class BaseTask(ABC):
-    """Abstract base class for all tasks.
+class BaseTask:
+    """Base class for all tasks.
     
-    Each task defines:
-    - A prompt template for formatting questions
-    - A format for response structure (system prompt + extractor)
-    - A reward for evaluating responses
+    Each task is configured via a config file that specifies:
+    - Template type for formatting questions
+    - Reward type for evaluating responses
+    - Format type for response structure (system prompt + extractor)
     """
 
-    def __init__(self, name: Optional[str] = None, format: Optional[BaseFormat] = None):
-        """Initialize task.
+    def __init__(self, config: Union[str, Path, TaskConfig, Dict[str, Any]]):
+        """Initialize task from config.
         
         Args:
-            name: Task name (defaults to class name)
-            format: Response format instance (uses default if None)
+            config: Config file path (str/Path), TaskConfig instance, or dict
         """
-        self.name = name or self.__class__.__name__
-        self.format = format or self._create_format()
-        self.reward = self._create_reward()
-
-    @abstractmethod
-    def _create_reward(self) -> BaseReward:
-        """Create the reward instance for this task.
+        # Load config
+        if isinstance(config, (str, Path)):
+            self.config = TaskConfig.from_json(config)
+        elif isinstance(config, TaskConfig):
+            self.config = config
+        elif isinstance(config, dict):
+            self.config = TaskConfig.from_dict(config)
+        else:
+            raise TypeError(f"config must be str, Path, TaskConfig, or dict, got {type(config)}")
         
-        Returns:
-            Reward instance
-        """
-        pass
-
-    @abstractmethod
-    def _create_format(self) -> BaseFormat:
-        """Create the format instance for this task.
+        self.name = self.__class__.__name__
         
-        Returns:
-            Format instance
-        """
-        pass
+        # Create template, format and reward from config
+        self.template = create_chat_template(
+            self.config.template_type,
+            **(self.config.template_kwargs or {})
+        )
+        self.format = create_format(
+            self.config.format_type,
+            **(self.config.format_kwargs or {})
+        )
+        self.reward = create_reward(
+            self.config.reward_type,
+            **(self.config.reward_kwargs or {})
+        )
+    
 
-    @abstractmethod
-    def get_prompt_template(self) -> str:
-        """Get the prompt template string for this task.
-        
-        Returns:
-            Template string (can use $variable syntax for string.Template)
-        """
-        pass
-
-    def get_system_prompt(self) -> str:
-        """Get the system prompt for this task from its format.
-        
-        Returns:
-            System prompt string
-        """
-        return self.format.get_system_prompt()
-
-    def answer_extractor(self, response: str) -> Dict[str, Optional[str]]:
+    def extract_answer(self, response: str) -> Dict[str, Optional[str]]:
         """Extract information from a model response using the task's format.
         
         Args:
@@ -80,57 +71,27 @@ class BaseTask(ABC):
         return self.format.extract(response)
 
     def format_query(self, question: str, **kwargs) -> str:
-        """Format a query from a question using the task's template.
+        """Format a query from a question using the task's chat template.
         
-        This is an alias for format_prompt for consistency.
-        
-        Args:
-            question: The question/problem to format
-            **kwargs: Additional variables for template substitution
-            
-        Returns:
-            Formatted query string
-        """
-        return self.format_prompt(question, **kwargs)
-
-    def format_prompt(self, question: str, **kwargs) -> str:
-        """Format a prompt from a question using the task's template.
+        Combines the question with the system prompt from the format using
+        the configured chat template. This is the preferred method for
+        formatting queries for model generation.
         
         Args:
             question: The question/problem to format
-            **kwargs: Additional variables for template substitution
+            **kwargs: Additional arguments passed to template.format
+                      (e.g., add_generation_prompt=True)
             
         Returns:
-            Formatted prompt string
+            Formatted query string ready for model input
         """
-        template_str = self.get_prompt_template()
-        template = Template(template_str)
-        
-        # Default variables
-        template_vars = {
-            'question': question,
+        messages = self.format.format_message(question)
+        add_generation_prompt = kwargs.pop('add_generation_prompt', True)
+        return self.template.format(
+            messages=messages,
+            add_generation_prompt=add_generation_prompt,
             **kwargs
-        }
-        
-        return template.safe_substitute(template_vars)
-
-    def format_prompts(self, questions: Union[str, List[str]], **kwargs) -> Union[str, List[str]]:
-        """Format multiple prompts from questions.
-        
-        Args:
-            questions: Single question or list of questions
-            **kwargs: Additional variables for template substitution
-            
-        Returns:
-            Formatted prompt(s)
-        """
-        is_single = isinstance(questions, str)
-        if is_single:
-            questions = [questions]
-        
-        prompts = [self.format_prompt(q, **kwargs) for q in questions]
-        
-        return prompts[0] if is_single else prompts
+        )
 
     def evaluate(
         self,
@@ -148,7 +109,8 @@ class BaseTask(ABC):
         Returns:
             Reward score(s)
         """
-        return self.reward.compute(predictions, references, **kwargs)
+        answers = [self.extract_answer(prediction) for prediction in predictions]
+        return self.reward.compute(answers, references, **kwargs)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name})"

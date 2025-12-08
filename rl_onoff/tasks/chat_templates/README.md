@@ -1,78 +1,76 @@
 # Chat Templates
 
-Chat templates format queries with task-specific system prompts into a single prompt string that models can process.
+Chat templates format conversations into prompt strings that models can process. They handle different chat formats like OpenAI, Llama, ChatML, and Simple.
 
-## Main Usage: format_query()
+## Main Usage: format()
 
-The primary method for task-based formatting is `format_query()`, which combines a query with a system prompt that explains the output format.
+The primary method for formatting conversations is `format()`, which takes a list of messages and formats them according to the template style.
 
 ### Basic Usage
 
 ```python
-from rl_onoff.tasks.chat_templates import OpenAIChatTemplate
+from rl_onoff.tasks.chat_templates import create_chat_template
 
-template = OpenAIChatTemplate()
+# Create a template from name
+template = create_chat_template("openai")
 
-# Format query with task-specific system prompt
-query = "What is 2+2?"
-prompt = template.format_query(query, task_type="math")
-# Automatically uses math system prompt and formats appropriately
+# Format messages
+messages = [
+    {"role": "system", "content": "You are a helpful assistant."},
+    {"role": "user", "content": "What is 2+2?"}
+]
+prompt = template.format(messages, add_generation_prompt=True)
 ```
 
-### Available Task Types
+### Using Registry
 
-- **"math"** - Math problem solving (styles: "default", "boxed", "concise")
-- **"coding"** - Code generation (styles: "default", "python", "test")
-- **"qa"** - Question answering (styles: "default", "detailed", "concise")
-- **"general"** - General tasks (styles: "default", "step_by_step")
+```python
+from rl_onoff.tasks.chat_templates import CHAT_TEMPLATE_REGISTRY
+
+# Access classes directly from registry
+OpenAIChatTemplate = CHAT_TEMPLATE_REGISTRY["openai"]
+template = OpenAIChatTemplate()
+```
 
 ### Examples
 
-#### Math Task
+#### OpenAI Format
 
 ```python
-from rl_onoff.tasks.chat_templates import OpenAIChatTemplate
+from rl_onoff.tasks.chat_templates import create_chat_template
 
-template = OpenAIChatTemplate()
-
-# Default math prompt
-prompt = template.format_query("Solve: 2x + 5 = 15", task_type="math")
-# Uses math system prompt explaining step-by-step solution format
-
-# Boxed answer format
-prompt = template.format_query("What is 2+2?", task_type="math", prompt_style="boxed")
-# Uses system prompt that asks for \\boxed{{answer}} format
+template = create_chat_template("openai")
+messages = [
+    {"role": "system", "content": "You are a math tutor."},
+    {"role": "user", "content": "What is 2+2?"}
+]
+prompt = template.format(messages, add_generation_prompt=True)
 ```
 
-#### Coding Task
+#### Llama Format
 
 ```python
-from rl_onoff.tasks.chat_templates import LlamaChatTemplate
+from rl_onoff.tasks.chat_templates import create_chat_template
 
-template = LlamaChatTemplate()
-
-# Python coding task
-prompt = template.format_query(
-    "Write a function to calculate factorial",
-    task_type="coding",
-    prompt_style="python"
-)
-# Uses coding system prompt with Python-specific instructions
+template = create_chat_template("llama")
+messages = [
+    {"role": "system", "content": "You are a math tutor."},
+    {"role": "user", "content": "What is 2+2?"}
+]
+prompt = template.format(messages, add_generation_prompt=True)
 ```
 
 #### Custom System Prompt
 
 ```python
-from rl_onoff.tasks.chat_templates import ChatMLTemplate
+from rl_onoff.tasks.chat_templates import create_chat_template
 
-template = ChatMLTemplate()
-
-# Use custom system prompt
-custom_prompt = "You are an expert mathematician. Show all work."
-prompt = template.format_query(
-    "What is 2+2?",
-    system_prompt=custom_prompt
-)
+template = create_chat_template("chatml")
+messages = [
+    {"role": "system", "content": "You are an expert mathematician. Show all work."},
+    {"role": "user", "content": "What is 2+2?"}
+]
+prompt = template.format(messages, add_generation_prompt=True)
 ```
 
 ## Available Templates
@@ -129,20 +127,6 @@ prompt = template.format_query("What is 2+2?", task_type="math")
 # <|im_start|>user
 # What is 2+2?<|im_end|>
 # <|im_start|>assistant
-```
-
-## System Prompts
-
-System prompts are organized by task type and style. Access them directly:
-
-```python
-from rl_onoff.tasks.chat_templates import get_system_prompt
-
-# Get math system prompt
-math_prompt = get_system_prompt("math", "default")
-
-# Get coding system prompt with Python style
-coding_prompt = get_system_prompt("coding", "python")
 ```
 
 ## Creating Custom Templates

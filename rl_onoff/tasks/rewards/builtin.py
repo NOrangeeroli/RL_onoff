@@ -294,80 +294,6 @@ class MathVerifyReward(BaseReward):
                 "math_verify is not installed. Install it with: pip install math-verify"
             )
 
-    def _extract_answer(self, text: str) -> Optional[str]:
-        """Extract the final answer from solution text.
-        
-        This method looks for common patterns like:
-        - "The answer is X"
-        - "Answer: X"
-        - "X" (if text is just a number/expression)
-        - Boxed answers: "\\boxed{X}"
-        - Final line containing a number/expression
-        
-        Args:
-            text: Solution text
-            
-        Returns:
-            Extracted answer string or None if not found
-        """
-        import re
-        
-        # Remove extra whitespace
-        text = text.strip()
-        
-        # Try to find boxed answer: \boxed{...} or \boxed ...
-        boxed_pattern = r'\\boxed\{([^}]+)\}'
-        match = re.search(boxed_pattern, text)
-        if match:
-            return match.group(1).strip()
-        
-        # Try patterns like "The answer is X" or "Answer: X"
-        answer_patterns = [
-            r'(?:the\s+)?answer\s+is\s*:?\s*([^\n\.]+)',
-            r'answer\s*:?\s*([^\n\.]+)',
-            r'final\s+answer\s*:?\s*([^\n\.]+)',
-            r'solution\s*:?\s*([^\n\.]+)',
-        ]
-        
-        for pattern in answer_patterns:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                answer = match.group(1).strip()
-                # Remove trailing punctuation
-                answer = answer.rstrip('.,;!?')
-                if answer:
-                    return answer
-        
-        # Try to find the last number or mathematical expression
-        # Look for patterns like numbers, fractions, expressions
-        number_patterns = [
-            r'(-?\d+\.?\d*)',  # Simple number
-            r'(-?\d+/\d+)',  # Fraction
-            r'(-?\d+\s*[+\-*/]\s*\d+)',  # Simple expression
-        ]
-        
-        # Get the last few lines
-        lines = text.split('\n')
-        for line in reversed(lines[-5:]):  # Check last 5 lines
-            line = line.strip()
-            if not line:
-                continue
-            
-            # Check if line looks like an answer (contains numbers)
-            for pattern in number_patterns:
-                matches = re.findall(pattern, line)
-                if matches:
-                    # Return the last match
-                    return matches[-1]
-        
-        # If nothing found, try to return the last non-empty line
-        for line in reversed(lines):
-            line = line.strip()
-            if line and not line.startswith('#'):
-                return line
-        
-        return None
-
     def compute(
         self,
         predictions: Union[str, List[str]],
@@ -377,7 +303,7 @@ class MathVerifyReward(BaseReward):
         """Compute math verification score.
         
         Args:
-            predictions: Predicted solution text(s)
+            predictions: Predicted answer(s) (assumed to be already extracted)
             references: Reference answer(s) or list of reference lists
             **kwargs: Additional arguments
             
@@ -403,11 +329,11 @@ class MathVerifyReward(BaseReward):
         scores = []
         
         for pred, refs in zip(predictions, references):
-            # Extract answer from prediction
-            pred_answer = self._extract_answer(pred)
+            # Use prediction directly as answer (assumed to be already extracted)
+            pred_answer = pred.strip() if pred else None
             
-            if pred_answer is None:
-                # If we can't extract an answer, score is 0
+            if not pred_answer:
+                # If answer is empty, score is 0
                 scores.append(0.0)
                 continue
             
@@ -427,3 +353,54 @@ class MathVerifyReward(BaseReward):
             scores.append(1.0 if verified else 0.0)
         
         return scores[0] if is_single else scores
+
+
+if __name__ == "__main__":
+    # Simple usage example for MathVerifyReward
+    print("MathVerifyReward Usage Example")
+    print("=" * 50)
+    
+    try:
+        # Create a MathVerifyReward instance
+        reward = MathVerifyReward()
+        
+        # Example 1: Single prediction and reference
+        print("\nExample 1: Single answer verification")
+        prediction = "42"
+        reference = "42"
+        score = reward.compute(prediction, reference)
+        print(f"Prediction: {prediction}")
+        print(f"Reference: {reference}")
+        print(f"Score: {score}")
+        
+        # Example 2: Different but equivalent expressions
+        print("\nExample 2: Equivalent expressions")
+        prediction = "2 + 2"
+        reference = "4"
+        score = reward.compute(prediction, reference)
+        print(f"Prediction: {prediction}")
+        print(f"Reference: {reference}")
+        print(f"Score: {score}")
+        
+        # Example 3: Multiple predictions and references
+        print("\nExample 3: Multiple answers")
+        predictions = ["10", "15", "20"]
+        references = ["5 * 2", "3 * 5", "4 * 5"]
+        scores = reward.compute(predictions, references)
+        print(f"Predictions: {predictions}")
+        print(f"References: {references}")
+        print(f"Scores: {scores}")
+        
+        # Example 4: Incorrect answer
+        print("\nExample 4: Incorrect answer")
+        prediction = "5"
+        reference = "10"
+        score = reward.compute(prediction, reference)
+        print(f"Prediction: {prediction}")
+        print(f"Reference: {reference}")
+        print(f"Score: {score}")
+        
+    except ImportError as e:
+        print(f"\nError: {e}")
+        print("To use MathVerifyReward, install math-verify:")
+        print("  pip install math-verify")

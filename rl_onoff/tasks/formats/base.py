@@ -1,7 +1,7 @@
 """Base format interface for response formats."""
 
 from abc import ABC, abstractmethod
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 
 class BaseFormat(ABC):
@@ -10,6 +10,7 @@ class BaseFormat(ABC):
     Each format defines:
     - A system prompt that explains the expected response format
     - An extractor method to parse responses following that format
+    - A method to format a question into messages for chat templates
     """
 
     def __init__(self, name: Optional[str] = None):
@@ -45,6 +46,24 @@ class BaseFormat(ABC):
             Values can be None if not found or not applicable.
         """
         pass
+
+    def format_message(self, question: str) -> List[Dict[str, str]]:
+        """Format a question into a list of message dicts for chat templates.
+        
+        Args:
+            question: The question/problem string
+            
+        Returns:
+            List of message dicts with 'role' and 'content' keys:
+            - First message: {'role': 'system', 'content': system_prompt}
+            - Second message: {'role': 'user', 'content': question}
+        """
+        messages = []
+        system_prompt = self.get_system_prompt()
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": question})
+        return messages
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name})"

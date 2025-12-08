@@ -1,57 +1,43 @@
 """Math task with prompt template and math verification reward."""
 
-from typing import Optional
+from typing import Union
+from pathlib import Path
 
 from rl_onoff.tasks.base import BaseTask
-from rl_onoff.tasks.rewards.builtin import MathVerifyReward
-from rl_onoff.tasks.formats.base import BaseFormat
-from rl_onoff.tasks.formats.boxed import BoxedFormat
-from rl_onoff.tasks.formats.structured import StructuredFormat
+from rl_onoff.tasks.config import TaskConfig
 
 
 class MathTask(BaseTask):
     """Math problem-solving task.
     
-    Includes:
-    - Prompt template for math problems
-    - Response format (system prompt + extractor)
-    - MathVerifyReward for evaluating solutions
+    Configured via a config file that specifies:
+    - Template type for formatting questions
+    - Reward type (typically "math_verify")
+    - Format type (typically "boxed" or "structured")
     """
 
-    def __init__(
-        self, 
-        prompt_template: Optional[str] = None, 
-        name: Optional[str] = None,
-        format: Optional[BaseFormat] = None
-    ):
-        """Initialize math task.
+    def __init__(self, config: Union[str, Path, TaskConfig, dict] = None):
+        """Initialize math task from config.
         
         Args:
-            prompt_template: Custom prompt template (uses default if None)
-            name: Task name (defaults to "math")
-            format: Response format instance (defaults to BoxedFormat)
+            config: Config file path, TaskConfig instance, dict, or None for default config
         """
-        self._custom_template = prompt_template
-        super().__init__(name=name or "math", format=format)
-
-    def _create_reward(self) -> MathVerifyReward:
-        """Create the math verification reward."""
-        return MathVerifyReward()
-
-    def _create_format(self) -> BaseFormat:
-        """Create the default format for math task (boxed format)."""
-        return BoxedFormat()
-
+        if config is None:
+            # Default math task config
+            config = TaskConfig(
+                template_type="simple",
+                reward_type="math_verify",
+                format_type="boxed"
+            )
+        
+        super().__init__(config)
+    
     def get_prompt_template(self) -> str:
         """Get the prompt template for math problems.
         
         Returns:
             Template string with $question placeholder
         """
-        if self._custom_template is not None:
-            return self._custom_template
-        
-        # Default math prompt template
         return """Solve the following math problem step by step. Show your work and provide the final answer.
 
 Problem: $question
