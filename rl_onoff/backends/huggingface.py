@@ -188,3 +188,91 @@ class HuggingFaceBackend(BaseBackend):
             self.load()
         return self.tokenizer
 
+
+if __name__ == "__main__":
+    """Simple use cases for HuggingFaceBackend."""
+    
+    # Example 1: Basic text generation
+    print("=" * 60)
+    print("Example 1: Basic text generation")
+    print("=" * 60)
+    
+    # Initialize backend (use a small model for testing, e.g., "gpt2")
+    # Replace with your preferred model name
+    backend = HuggingFaceBackend(
+        model_name="gpt2",  # Replace with your model
+        device="cpu"  # Use "cuda" if GPU is available
+    )
+    
+    # Generate text from a single prompt
+    prompt = "The future of AI is"
+    generated = backend.generate(
+        prompt,
+        max_new_tokens=20,
+        temperature=0.7,
+        do_sample=True
+    )
+    print(f"Prompt: {prompt}")
+    print(f"Generated: {generated}\n")
+    
+    # Example 2: Generate from multiple prompts
+    print("=" * 60)
+    print("Example 2: Generate from multiple prompts")
+    print("=" * 60)
+    
+    prompts = [
+        "Python is",
+        "Machine learning is"
+    ]
+    generated_texts = backend.generate(
+        prompts,
+        max_new_tokens=15,
+        temperature=0.8
+    )
+    for prompt, text in zip(prompts, generated_texts):
+        print(f"Prompt: {prompt}")
+        print(f"Generated: {text}\n")
+    
+    # Example 3: Encode and decode text
+    print("=" * 60)
+    print("Example 3: Encode and decode text")
+    print("=" * 60)
+    
+    text = "Hello, world!"
+    token_ids = backend.encode(text)
+    print(f"Text: {text}")
+    print(f"Token IDs: {token_ids}")
+    
+    decoded = backend.decode(token_ids)
+    print(f"Decoded: {decoded}\n")
+    
+    # Example 4: Get logits for a prompt
+    print("=" * 60)
+    print("Example 4: Get logits for a prompt")
+    print("=" * 60)
+    
+    logits = backend.get_logits("The answer is", max_new_tokens=1)
+    print(f"Logits shape: {logits.shape}")
+    print(f"Vocabulary size: {logits.shape[-1]}")
+    print(f"Top 5 token probabilities: {logits[0][:5]}\n")
+    
+    # Example 5: Get probability distributions
+    print("=" * 60)
+    print("Example 5: Get probability distributions")
+    print("=" * 60)
+    
+    probs = backend.get_probabilities("The answer is", max_new_tokens=1, temperature=1.0)
+    print(f"Probabilities shape: {probs.shape}")
+    print(f"Sum of probabilities: {probs.sum():.4f}")  # Should be ~1.0
+    print(f"Top 5 probabilities: {probs[0][:5]}\n")
+    
+    # Example 6: Access tokenizer directly
+    print("=" * 60)
+    print("Example 6: Access tokenizer directly")
+    print("=" * 60)
+    
+    tokenizer = backend.get_tokenizer()
+    print(f"Tokenizer: {type(tokenizer).__name__}")
+    print(f"Vocabulary size: {len(tokenizer)}\n")
+
+
