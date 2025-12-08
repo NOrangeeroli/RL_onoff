@@ -200,8 +200,8 @@ if __name__ == "__main__":
     # Initialize backend (use a small model for testing, e.g., "gpt2")
     # Replace with your preferred model name
     backend = HuggingFaceBackend(
-        model_name="gpt2",  # Replace with your model
-        device="cpu"  # Use "cuda" if GPU is available
+        model_name="meta-llama/Meta-Llama-3.1-8B-Instruct",  # Replace with your model
+        device="cuda"  # Use "cuda" if GPU is available
     )
     
     # Generate text from a single prompt
