@@ -1,0 +1,32 @@
+name: rl_onoff_hf
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  # Python version
+  - python=3.10
+  
+  # Core scientific computing (conda packages)
+  - numpy>=1.24.0,<2.0.0
+  - scipy>=1.10.0
+  - pandas>=2.0.0
+  
+  # PyTorch ecosystem (flexible version for HuggingFace)
+  - pytorch>=2.0.0
+  
+  # CLI and utilities
+  - click>=8.1.0
+  - tqdm>=4.65.0
+  
+  # Build tools
+  - ninja>=1.11.1
+  
+  # Pip (required for installing Python packages)
+  - pip
+  
+  # Note: After creating the environment, install pip packages separately:
+  #   conda activate rl_onoff_hf
+  #   pip install -r envs/requirements_huggingface.txt
+  # This is faster than installing pip packages during conda env create
+

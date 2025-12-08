@@ -1,0 +1,34 @@
+name: rl_onoff_vllm
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  # Python version
+  - python=3.10
+  
+  # Core scientific computing (conda packages)
+  - numpy>=1.24.0,<2.0.0
+  - scipy>=1.10.0
+  - pandas>=2.0.0
+  
+  # PyTorch ecosystem (specific versions required by vLLM 0.6.5)
+  - pytorch=2.5.1  # Required by vLLM 0.6.5 and xformers
+  - torchvision=0.20.1  # Compatible with pytorch 2.5.1
+
+  
+  # CLI and utilities
+  - click>=8.1.0
+  - tqdm>=4.65.0
+  
+  # Build tools
+  - ninja>=1.11.1
+  
+  # Pip (required for installing Python packages)
+  - pip
+  
+  # Note: After creating the environment, install pip packages separately:
+  #   conda activate rl_onoff_vllm
+  #   pip install -r envs/requirements_vllm.txt
+  # This is faster than installing pip packages during conda env create
+

@@ -1,0 +1,44 @@
+# Requirements for HuggingFace backend environment
+# Install with: pip install -r requirements_huggingface.txt
+
+# Core ML libraries
+transformers>=4.30.0
+datasets>=2.14.0
+
+# Metrics dependencies
+nltk>=3.8.0
+rouge-score>=0.1.2
+
+# Additional dependencies for various packages
+colorama>=0.2.5,<0.4.7
+webencodings>=0.5.0
+scikit-learn>=1.1.0
+cycler>=0.10
+fonttools>=4.22.0
+kiwisolver>=1.3.1
+nest_asyncio>=1.5.0
+tenacity>=6.2.0
+lxml>=4.0.0
+markdown>=2.6.8
+
+# Missing dependencies for various packages
+defusedxml>=0.7.1
+cryptography>=3.4.8
+smmap>=5.0.0
+more-itertools>=8.14.0
+tornado>=6.1
+chardet>=5.0.0
+pyasn1>=0.4.8
+
+# Version constraints for compatibility
+pydantic<=2.10.6  # Required by llamafactory (conflicts with openai-harmony)
+trl>=0.8.6,<=0.9.6  # Required by llamafactory
+lark>=1.1.5,<1.2.0  # Required by pddl
+outlines-core==0.1.26  # Required by outlines
+
+# Development dependencies
+pytest>=7.4.0
+pytest-cov>=4.1.0
+black>=23.7.0
+flake8>=6.1.0
+
