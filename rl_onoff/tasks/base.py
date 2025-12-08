@@ -109,11 +109,21 @@ class BaseTask:
         Returns:
             Reward score(s)
         """
+        # Check if single prediction
+        is_single = isinstance(predictions, str)
+        if is_single:
+            predictions = [predictions]
+        
         # Extract answers from responses
         extracted = [self.extract_answer(prediction) for prediction in predictions]
         # Extract the "answer" field from each extracted dict (handle None values)
         answers = [ext.get("answer") or "" for ext in extracted]
-        return self.reward.compute(answers, references, **kwargs)
+        
+        # Compute scores
+        scores = self.reward.compute(answers, references, **kwargs)
+        
+        # Return single value for single prediction, list for multiple
+        return scores[0] if is_single and isinstance(scores, list) else scores
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name})"
