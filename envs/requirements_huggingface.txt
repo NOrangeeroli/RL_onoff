@@ -29,6 +29,10 @@ more-itertools>=8.14.0
 tornado>=6.1
 chardet>=5.0.0
 pyasn1>=0.4.8
+decorator>=4.3.0  # Required by librosa
+numba>=0.51.0  # Required by librosa
+importlib-metadata>=6.8.0  # Required by litellm
+openai>=1.51.0  # Required by litellm
 
 # Version constraints for compatibility
 pydantic<=2.10.6  # Required by llamafactory (conflicts with openai-harmony)
