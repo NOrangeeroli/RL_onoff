@@ -64,11 +64,9 @@ dependencies:
     - outlines-core==0.1.26  # Required by outlines
     
     # SGLang backend - install with compiled kernels
-    # IMPORTANT: After creating the environment, install SGLang with:
-    #   pip install 'sglang[all]'
-    # This ensures compiled kernels (sgl_kernel) are included
+    # Using 'sglang[all]' to ensure compiled kernels (sgl_kernel) are included
     # If you get "ModuleNotFoundError: No module named 'sgl_kernel'", see requirements.txt notes
-    - sglang>=0.1.0
+    - "sglang[all]>=0.1.0"
     
     # Development dependencies
     - pytest>=7.4.0
