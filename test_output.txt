@@ -1,7 +1,7 @@
 Test Execution Report
 ====================
 Command: pytest tests/utils/test_data_loader.py -v
-Date: Mon Dec  8 06:39:29 CET 2025
+Date: Mon Dec  8 06:43:16 CET 2025
 Working Directory: /lustre/fast/fast/txiao/ym/rl_onoff
 
 Output:
@@ -16,7 +16,7 @@ collecting ... collected 18 items
 tests/utils/test_data_loader.py::TestDataLoader::test_load_json PASSED   [  5%]
 tests/utils/test_data_loader.py::TestDataLoader::test_load_jsonl PASSED  [ 11%]
 tests/utils/test_data_loader.py::TestDataLoader::test_load_csv PASSED    [ 16%]
-tests/utils/test_data_loader.py::TestDataLoader::test_load_csv_preserves_columns FAILED [ 22%]
+tests/utils/test_data_loader.py::TestDataLoader::test_load_csv_preserves_columns PASSED [ 22%]
 tests/utils/test_data_loader.py::TestDataLoader::test_load_data_auto_detect_json PASSED [ 27%]
 tests/utils/test_data_loader.py::TestDataLoader::test_load_data_auto_detect_jsonl PASSED [ 33%]
 tests/utils/test_data_loader.py::TestDataLoader::test_load_data_auto_detect_csv PASSED [ 38%]
@@ -33,26 +33,9 @@ tests/utils/test_data_loader.py::TestDataLoader::test_load_real_parquet_math PAS
 tests/utils/test_data_loader.py::TestDataLoader::test_load_real_parquet_preserves_all_columns SKIPPED [100%]
 
 =================================== FAILURES ===================================
-________________ TestDataLoader.test_load_csv_preserves_columns ________________
-
-self = <tests.utils.test_data_loader.TestDataLoader object at 0x1510d2a4c250>
-sample_csv_file = '/home/txiao/tmpdir/tmpdiovhj89.csv'
-
-    def test_load_csv_preserves_columns(self, sample_csv_file):
-        """Test loading CSV preserves all columns."""
-        data = DataLoader.load_csv(sample_csv_file)
-        assert len(data) == 2
-        # Original column names are preserved
-        assert "question" in data[0]
-        assert "solution" in data[0]
-        assert data[0]["question"] == "What is 2+2?"
->       assert data[0]["solution"] == "4"
-E       AssertionError: assert 4 == '4'
-
-tests/utils/test_data_loader.py:122: AssertionError
 _________________ TestDataLoader.test_load_real_parquet_files __________________
 
-self = <tests.utils.test_data_loader.TestDataLoader object at 0x1510d2a40460>
+self = <tests.utils.test_data_loader.TestDataLoader object at 0x150ce1728370>
 
     @pytest.mark.integration
     def test_load_real_parquet_files(self):
@@ -77,62 +60,38 @@ self = <tests.utils.test_data_loader.TestDataLoader object at 0x1510d2a40460>
     
             try:
                 # First, check what columns exist
->               df_sample = pd.read_parquet(str(file_path_obj), nrows=1)
-
-tests/utils/test_data_loader.py:273: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-/fast/txiao/conda_envs/rlon/lib/python3.10/site-packages/pandas/io/parquet.py:669: in read_parquet
-    return impl.read(
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
-self = <pandas.io.parquet.PyArrowImpl object at 0x1510d27d6740>
-path = 'data/gsm8k_level1/train.parquet', columns = None, filters = None
-use_nullable_dtypes = False, dtype_backend = <no_default>
-storage_options = None, filesystem = None
-kwargs = {'nrows': 1, 'use_pandas_metadata': True}, to_pandas_kwargs = {}
-manager = 'block'
-path_or_handle = <_io.BufferedReader name='data/gsm8k_level1/train.parquet'>
-handles = IOHandles(handle=<_io.BufferedReader name='data/gsm8k_level1/train.parquet'>, compression={'method': None}, created_handles=[], is_wrapped=False)
-
-    def read(
-        self,
-        path,
-        columns=None,
-        filters=None,
-        use_nullable_dtypes: bool = False,
-        dtype_backend: DtypeBackend | lib.NoDefault = lib.no_default,
-        storage_options: StorageOptions | None = None,
-        filesystem=None,
-        **kwargs,
-    ) -> DataFrame:
-        kwargs["use_pandas_metadata"] = True
+                # Read full file and take first row (pd.read_parquet doesn't support nrows)
+                df_full = pd.read_parquet(str(file_path_obj))
+                df_sample = df_full.head(1)
+                original_columns = list(df_sample.columns)
+                print(f"\n{file_path} columns: {original_columns}")
     
-        to_pandas_kwargs = {}
+                # Load using DataLoader
+                data = load_data(file_path)
     
-        manager = _get_option("mode.data_manager", silent=True)
-        if manager == "array":
-            to_pandas_kwargs["split_blocks"] = True
-        path_or_handle, handles, filesystem = _get_path_or_handle(
-            path,
-            filesystem,
-            storage_options=storage_options,
-            mode="rb",
-        )
-        try:
->           pa_table = self.api.parquet.read_table(
-                path_or_handle,
-                columns=columns,
-                filesystem=filesystem,
-                filters=filters,
-                **kwargs,
-            )
-E           TypeError: read_table() got an unexpected keyword argument 'nrows'
+                # Verify we got data
+                assert isinstance(data, list)
+                assert len(data) > 0
+    
+                # Verify structure - original column names are preserved
+                # Check that all original columns are present
+                loaded_columns = list(data[0].keys())
+                for col in original_columns:
+                    assert col in data[0], f"Column '{col}' missing in loaded data"
+    
+                # Verify data types (check first few columns)
+                for col in original_columns[:3]:  # Check first 3 columns
+                    assert col in data[0]
+                    # Most columns should be strings, numbers, or None
+>                   assert isinstance(data[0][col], (str, int, float, type(None), bool, list, dict))
+E                   AssertionError: assert False
+E                    +  where False = isinstance(array([{'content': 'Mrs. Gable’s third grade class is on a field trip to the beach. For lunch, Mrs. Gable brought 20 lunches for the 20 students in her class. She included a pack of animal crackers in each lunch bag for dessert. Each pack of animal crackers contained 10 animal crackers. If 2 students did not eat their animal crackers, how many animal crackers were eaten in total among Mrs. Gable’s students?', 'role': 'user'}],\n      dtype=object), (<class 'str'>, <class 'int'>, <class 'float'>, <class 'NoneType'>, <class 'bool'>, <class 'list'>, ...))
 
-/fast/txiao/conda_envs/rlon/lib/python3.10/site-packages/pandas/io/parquet.py:265: TypeError
+tests/utils/test_data_loader.py:297: AssertionError
 
 During handling of the above exception, another exception occurred:
 
-self = <tests.utils.test_data_loader.TestDataLoader object at 0x1510d2a40460>
+self = <tests.utils.test_data_loader.TestDataLoader object at 0x150ce1728370>
 
     @pytest.mark.integration
     def test_load_real_parquet_files(self):
@@ -157,7 +116,9 @@ self = <tests.utils.test_data_loader.TestDataLoader object at 0x1510d2a40460>
     
             try:
                 # First, check what columns exist
-                df_sample = pd.read_parquet(str(file_path_obj), nrows=1)
+                # Read full file and take first row (pd.read_parquet doesn't support nrows)
+                df_full = pd.read_parquet(str(file_path_obj))
+                df_sample = df_full.head(1)
                 original_columns = list(df_sample.columns)
                 print(f"\n{file_path} columns: {original_columns}")
     
@@ -186,36 +147,13 @@ self = <tests.utils.test_data_loader.TestDataLoader object at 0x1510d2a40460>
     
             except Exception as e:
 >               pytest.fail(f"Failed to load {file_path}: {e}")
-E               Failed: Failed to load data/gsm8k_level1/train.parquet: read_table() got an unexpected keyword argument 'nrows'
+E               Failed: Failed to load data/gsm8k_level1/train.parquet: assert False
+E                +  where False = isinstance(array([{'content': 'Mrs. Gable’s third grade class is on a field trip to the beach. For lunch, Mrs. Gable brought 20 lunches for the 20 students in her class. She included a pack of animal crackers in each lunch bag for dessert. Each pack of animal crackers contained 10 animal crackers. If 2 students did not eat their animal crackers, how many animal crackers were eaten in total among Mrs. Gable’s students?', 'role': 'user'}],\n      dtype=object), (<class 'str'>, <class 'int'>, <class 'float'>, <class 'NoneType'>, <class 'bool'>, <class 'list'>, ...))
 
-tests/utils/test_data_loader.py:301: Failed
-=============================== warnings summary ===============================
-tests/utils/test_data_loader.py:187
-  /lustre/fast/fast/txiao/ym/rl_onoff/tests/utils/test_data_loader.py:187: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
-    @pytest.mark.integration
+tests/utils/test_data_loader.py:304: Failed
+----------------------------- Captured stdout call -----------------------------
 
-tests/utils/test_data_loader.py:223
-  /lustre/fast/fast/txiao/ym/rl_onoff/tests/utils/test_data_loader.py:223: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
-    @pytest.mark.integration
-
-tests/utils/test_data_loader.py:250
-  /lustre/fast/fast/txiao/ym/rl_onoff/tests/utils/test_data_loader.py:250: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
-    @pytest.mark.integration
-
-tests/utils/test_data_loader.py:303
-  /lustre/fast/fast/txiao/ym/rl_onoff/tests/utils/test_data_loader.py:303: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
-    @pytest.mark.integration
-
-tests/utils/test_data_loader.py:337
-  /lustre/fast/fast/txiao/ym/rl_onoff/tests/utils/test_data_loader.py:337: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
-    @pytest.mark.integration
-
-tests/utils/test_data_loader.py:363
-  /lustre/fast/fast/txiao/ym/rl_onoff/tests/utils/test_data_loader.py:363: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
-    @pytest.mark.integration
-
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+data/gsm8k_level1/train.parquet columns: ['target', 'data_source', 'prompt', 'ability', 'reward_model', 'extra_info']
 =========================== short test summary info ============================
-FAILED tests/utils/test_data_loader.py::TestDataLoader::test_load_csv_preserves_columns
 FAILED tests/utils/test_data_loader.py::TestDataLoader::test_load_real_parquet_files
-============= 2 failed, 14 passed, 2 skipped, 6 warnings in 30.89s =============
+=================== 1 failed, 15 passed, 2 skipped in 22.84s ===================
