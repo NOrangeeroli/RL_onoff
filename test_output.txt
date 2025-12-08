@@ -1,7 +1,7 @@
 Test Execution Report
 ====================
-Command: pytest tests/test_utils.py -v
-Date: Mon Dec  8 05:30:25 CET 2025
+Command: pytest tests/test_backends.py -v
+Date: Mon Dec  8 05:36:33 CET 2025
 Working Directory: /lustre/fast/fast/txiao/ym/rl_onoff
 
 Output:
@@ -11,518 +11,52 @@ platform linux -- Python 3.10.19, pytest-9.0.2, pluggy-1.6.0 -- /fast/txiao/cond
 cachedir: .pytest_cache
 rootdir: /lustre/fast/fast/txiao/ym/rl_onoff
 plugins: anyio-4.4.0, typeguard-4.3.0, cov-7.0.0
-collecting ... collected 23 items
+collecting ... collected 15 items
 
-tests/test_utils.py::TestUtilsSamplingAndMetrics::test_config_for_sampling PASSED [  4%]
-tests/test_utils.py::TestUtilsSamplingAndMetrics::test_data_loader_with_sampling FAILED [  8%]
-tests/test_utils.py::TestUtilsSamplingAndMetrics::test_data_loader_with_metrics FAILED [ 13%]
-tests/test_utils.py::TestUtilsDistributionExtraction::test_data_loader_for_distribution_extraction FAILED [ 17%]
-tests/test_utils.py::TestUtilsDistributionExtraction::test_config_for_extraction PASSED [ 21%]
-tests/test_utils.py::TestUtilsDivergenceCalculation::test_data_loader_for_divergence FAILED [ 26%]
-tests/test_utils.py::TestUtilsDivergenceCalculation::test_config_for_divergence PASSED [ 30%]
-tests/test_utils.py::TestUtilsModelSwitching::test_data_loader_for_switching FAILED [ 34%]
-tests/test_utils.py::TestUtilsModelSwitching::test_config_for_switching PASSED [ 39%]
-tests/test_utils.py::TestUtilsConfig::test_config_to_dict PASSED         [ 43%]
-tests/test_utils.py::TestUtilsConfig::test_config_to_json PASSED         [ 47%]
-tests/test_utils.py::TestUtilsConfig::test_config_from_dict PASSED       [ 52%]
-tests/test_utils.py::TestUtilsConfig::test_config_from_json PASSED       [ 56%]
-tests/test_utils.py::TestUtilsDataLoader::test_load_json FAILED          [ 60%]
-tests/test_utils.py::TestUtilsDataLoader::test_load_jsonl FAILED         [ 65%]
-tests/test_utils.py::TestUtilsDataLoader::test_load_csv FAILED           [ 69%]
-tests/test_utils.py::TestUtilsDataLoader::test_load_csv_with_columns FAILED [ 73%]
-tests/test_utils.py::TestUtilsDataLoader::test_load_data_auto_detect_json FAILED [ 78%]
-tests/test_utils.py::TestUtilsDataLoader::test_load_data_auto_detect_jsonl FAILED [ 82%]
-tests/test_utils.py::TestUtilsDataLoader::test_load_data_auto_detect_csv FAILED [ 86%]
-tests/test_utils.py::TestUtilsDataLoader::test_load_data_file_not_found PASSED [ 91%]
-tests/test_utils.py::TestUtilsDataLoader::test_load_data_unsupported_format PASSED [ 95%]
-tests/test_utils.py::TestUtilsIntegration::test_all_purposes_with_utils FAILED [100%]
+tests/test_backends.py::TestBackendsSamplingAndMetrics::test_backend_generate_single PASSED [  6%]
+tests/test_backends.py::TestBackendsSamplingAndMetrics::test_backend_generate_batch PASSED [ 13%]
+tests/test_backends.py::TestBackendsSamplingAndMetrics::test_backend_with_sampler PASSED [ 20%]
+tests/test_backends.py::TestBackendsSamplingAndMetrics::test_backend_with_metrics PASSED [ 26%]
+tests/test_backends.py::TestBackendsDistributionExtraction::test_backend_get_logits PASSED [ 33%]
+tests/test_backends.py::TestBackendsDistributionExtraction::test_backend_get_probabilities PASSED [ 40%]
+tests/test_backends.py::TestBackendsDistributionExtraction::test_backend_with_distribution_extractor PASSED [ 46%]
+tests/test_backends.py::TestBackendsDivergenceCalculation::test_backend_get_distributions_for_divergence PASSED [ 53%]
+tests/test_backends.py::TestBackendsDivergenceCalculation::test_backend_encode_decode PASSED [ 60%]
+tests/test_backends.py::TestBackendsModelSwitching::test_backend_with_model_switcher PASSED [ 66%]
+tests/test_backends.py::TestBackendsModelSwitching::test_backend_get_probabilities_for_switching PASSED [ 73%]
+tests/test_backends.py::TestBackendsBase::test_base_backend_is_loaded PASSED [ 80%]
+tests/test_backends.py::TestBackendsBase::test_base_backend_repr PASSED  [ 86%]
+tests/test_backends.py::TestBackendsBase::test_get_backend_function FAILED [ 93%]
+tests/test_backends.py::TestBackendsIntegration::test_all_purposes_integration PASSED [100%]
 
 =================================== FAILURES ===================================
-__________ TestUtilsSamplingAndMetrics.test_data_loader_with_sampling __________
+__________________ TestBackendsBase.test_get_backend_function __________________
 
-self = <tests.test_utils.TestUtilsSamplingAndMetrics object at 0x14754f2acd90>
-sample_json_file = '/home/txiao/tmpdir/tmpe46uh7zs.json'
-mock_backend = MockBackend(model_name=mock_model)
+self = <tests.test_backends.TestBackendsBase object at 0x1535e61e1c00>
 
-    def test_data_loader_with_sampling(self, sample_json_file, mock_backend):
-        """Test loading data for sampling."""
->       data = load_data(sample_json_file)
+    def test_get_backend_function(self):
+        """Test get_backend factory function."""
+        with patch('rl_onoff.backends.huggingface.HuggingFaceBackend') as mock_hf:
+            backend = get_backend("huggingface", model_name="test")
+>           mock_hf.assert_called_once()
 
-tests/test_utils.py:141: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-rl_onoff/utils/data_loader.py:262: in load_data
-    return DataLoader.load_data(
-rl_onoff/utils/data_loader.py:213: in load_data
-    data = DataLoader.load_json(file_path)
-rl_onoff/utils/data_loader.py:35: in load_json
-    return json.load(f)
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/__init__.py:293: in load
-    return loads(fp.read(),
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/__init__.py:346: in loads
-    return _default_decoder.decode(s)
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/decoder.py:337: in decode
-    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+tests/test_backends.py:232: 
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <json.decoder.JSONDecoder object at 0x1476daf95660>, s = '', idx = 0
+self = <MagicMock name='HuggingFaceBackend' id='23321238183824'>
 
-    def raw_decode(self, s, idx=0):
-        """Decode a JSON document from ``s`` (a ``str`` beginning with
-        a JSON document) and return a 2-tuple of the Python
-        representation and the index in ``s`` where the document ended.
-    
-        This can be used to decode a JSON document from a string that may
-        have extraneous data at the end.
-    
+    def assert_called_once(self):
+        """assert that the mock was called only once.
         """
-        try:
-            obj, end = self.scan_once(s, idx)
-        except StopIteration as err:
->           raise JSONDecodeError("Expecting value", s, err.value) from None
-E           json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
-
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/decoder.py:355: JSONDecodeError
-__________ TestUtilsSamplingAndMetrics.test_data_loader_with_metrics ___________
-
-self = <tests.test_utils.TestUtilsSamplingAndMetrics object at 0x14754f2af490>
-sample_json_file = '/home/txiao/tmpdir/tmp1zcrk5e2.json'
-mock_backend = MockBackend(model_name=mock_model)
-
-    def test_data_loader_with_metrics(self, sample_json_file, mock_backend):
-        """Test loading data for metrics calculation."""
->       data = load_data(sample_json_file)
-
-tests/test_utils.py:158: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-rl_onoff/utils/data_loader.py:262: in load_data
-    return DataLoader.load_data(
-rl_onoff/utils/data_loader.py:213: in load_data
-    data = DataLoader.load_json(file_path)
-rl_onoff/utils/data_loader.py:35: in load_json
-    return json.load(f)
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/__init__.py:293: in load
-    return loads(fp.read(),
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/__init__.py:346: in loads
-    return _default_decoder.decode(s)
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/decoder.py:337: in decode
-    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
-self = <json.decoder.JSONDecoder object at 0x1476daf95660>, s = '', idx = 0
-
-    def raw_decode(self, s, idx=0):
-        """Decode a JSON document from ``s`` (a ``str`` beginning with
-        a JSON document) and return a 2-tuple of the Python
-        representation and the index in ``s`` where the document ended.
-    
-        This can be used to decode a JSON document from a string that may
-        have extraneous data at the end.
-    
-        """
-        try:
-            obj, end = self.scan_once(s, idx)
-        except StopIteration as err:
->           raise JSONDecodeError("Expecting value", s, err.value) from None
-E           json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
-
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/decoder.py:355: JSONDecodeError
-_ TestUtilsDistributionExtraction.test_data_loader_for_distribution_extraction _
-
-self = <tests.test_utils.TestUtilsDistributionExtraction object at 0x14754f2ac160>
-sample_json_file = '/home/txiao/tmpdir/tmp7ybag1md.json'
-mock_backend = MockBackend(model_name=mock_model)
-
-    def test_data_loader_for_distribution_extraction(self, sample_json_file, mock_backend):
-        """Test loading data for distribution extraction."""
->       data = load_data(sample_json_file)
-
-tests/test_utils.py:183: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-rl_onoff/utils/data_loader.py:262: in load_data
-    return DataLoader.load_data(
-rl_onoff/utils/data_loader.py:213: in load_data
-    data = DataLoader.load_json(file_path)
-rl_onoff/utils/data_loader.py:35: in load_json
-    return json.load(f)
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/__init__.py:293: in load
-    return loads(fp.read(),
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/__init__.py:346: in loads
-    return _default_decoder.decode(s)
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/decoder.py:337: in decode
-    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
-self = <json.decoder.JSONDecoder object at 0x1476daf95660>, s = '', idx = 0
-
-    def raw_decode(self, s, idx=0):
-        """Decode a JSON document from ``s`` (a ``str`` beginning with
-        a JSON document) and return a 2-tuple of the Python
-        representation and the index in ``s`` where the document ended.
-    
-        This can be used to decode a JSON document from a string that may
-        have extraneous data at the end.
-    
-        """
-        try:
-            obj, end = self.scan_once(s, idx)
-        except StopIteration as err:
->           raise JSONDecodeError("Expecting value", s, err.value) from None
-E           json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
-
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/decoder.py:355: JSONDecodeError
-________ TestUtilsDivergenceCalculation.test_data_loader_for_divergence ________
-
-self = <tests.test_utils.TestUtilsDivergenceCalculation object at 0x14754f2afd60>
-sample_json_file = '/home/txiao/tmpdir/tmpefv371df.json'
-mock_backend = MockBackend(model_name=mock_model)
-mock_backend_b = MockBackend(model_name=mock_model_b)
-
-    def test_data_loader_for_divergence(self, sample_json_file, mock_backend, mock_backend_b):
-        """Test loading data for divergence calculation."""
->       data = load_data(sample_json_file)
-
-tests/test_utils.py:213: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-rl_onoff/utils/data_loader.py:262: in load_data
-    return DataLoader.load_data(
-rl_onoff/utils/data_loader.py:213: in load_data
-    data = DataLoader.load_json(file_path)
-rl_onoff/utils/data_loader.py:35: in load_json
-    return json.load(f)
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/__init__.py:293: in load
-    return loads(fp.read(),
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/__init__.py:346: in loads
-    return _default_decoder.decode(s)
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/decoder.py:337: in decode
-    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
-self = <json.decoder.JSONDecoder object at 0x1476daf95660>, s = '', idx = 0
-
-    def raw_decode(self, s, idx=0):
-        """Decode a JSON document from ``s`` (a ``str`` beginning with
-        a JSON document) and return a 2-tuple of the Python
-        representation and the index in ``s`` where the document ended.
-    
-        This can be used to decode a JSON document from a string that may
-        have extraneous data at the end.
-    
-        """
-        try:
-            obj, end = self.scan_once(s, idx)
-        except StopIteration as err:
->           raise JSONDecodeError("Expecting value", s, err.value) from None
-E           json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
-
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/decoder.py:355: JSONDecodeError
-____________ TestUtilsModelSwitching.test_data_loader_for_switching ____________
-
-self = <tests.test_utils.TestUtilsModelSwitching object at 0x14754f2a2bf0>
-sample_json_file = '/home/txiao/tmpdir/tmpgwin5_98.json'
-mock_backend = MockBackend(model_name=mock_model)
-mock_backend_b = MockBackend(model_name=mock_model_b)
-
-    def test_data_loader_for_switching(self, sample_json_file, mock_backend, mock_backend_b):
-        """Test loading data for model switching."""
->       data = load_data(sample_json_file)
-
-tests/test_utils.py:245: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-rl_onoff/utils/data_loader.py:262: in load_data
-    return DataLoader.load_data(
-rl_onoff/utils/data_loader.py:213: in load_data
-    data = DataLoader.load_json(file_path)
-rl_onoff/utils/data_loader.py:35: in load_json
-    return json.load(f)
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/__init__.py:293: in load
-    return loads(fp.read(),
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/__init__.py:346: in loads
-    return _default_decoder.decode(s)
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/decoder.py:337: in decode
-    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
-self = <json.decoder.JSONDecoder object at 0x1476daf95660>, s = '', idx = 0
-
-    def raw_decode(self, s, idx=0):
-        """Decode a JSON document from ``s`` (a ``str`` beginning with
-        a JSON document) and return a 2-tuple of the Python
-        representation and the index in ``s`` where the document ended.
-    
-        This can be used to decode a JSON document from a string that may
-        have extraneous data at the end.
-    
-        """
-        try:
-            obj, end = self.scan_once(s, idx)
-        except StopIteration as err:
->           raise JSONDecodeError("Expecting value", s, err.value) from None
-E           json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
-
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/decoder.py:355: JSONDecodeError
-______________________ TestUtilsDataLoader.test_load_json ______________________
-
-self = <tests.test_utils.TestUtilsDataLoader object at 0x14754f2a1ba0>
-sample_json_file = '/home/txiao/tmpdir/tmp_sncnvv4.json'
-
-    def test_load_json(self, sample_json_file):
-        """Test loading JSON file."""
->       data = DataLoader.load_json(sample_json_file)
-
-tests/test_utils.py:351: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-rl_onoff/utils/data_loader.py:35: in load_json
-    return json.load(f)
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/__init__.py:293: in load
-    return loads(fp.read(),
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/__init__.py:346: in loads
-    return _default_decoder.decode(s)
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/decoder.py:337: in decode
-    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
-self = <json.decoder.JSONDecoder object at 0x1476daf95660>, s = '', idx = 0
-
-    def raw_decode(self, s, idx=0):
-        """Decode a JSON document from ``s`` (a ``str`` beginning with
-        a JSON document) and return a 2-tuple of the Python
-        representation and the index in ``s`` where the document ended.
-    
-        This can be used to decode a JSON document from a string that may
-        have extraneous data at the end.
-    
-        """
-        try:
-            obj, end = self.scan_once(s, idx)
-        except StopIteration as err:
->           raise JSONDecodeError("Expecting value", s, err.value) from None
-E           json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
-
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/decoder.py:355: JSONDecodeError
-_____________________ TestUtilsDataLoader.test_load_jsonl ______________________
-
-self = <tests.test_utils.TestUtilsDataLoader object at 0x14754f2a2620>
-sample_jsonl_file = '/home/txiao/tmpdir/tmpp3qhwy46.jsonl'
-
-    def test_load_jsonl(self, sample_jsonl_file):
-        """Test loading JSONL file."""
-        data = DataLoader.load_jsonl(sample_jsonl_file)
-        assert isinstance(data, list)
->       assert len(data) == 2
-E       assert 0 == 2
-E        +  where 0 = len([])
-
-tests/test_utils.py:360: AssertionError
-______________________ TestUtilsDataLoader.test_load_csv _______________________
-
-self = <tests.test_utils.TestUtilsDataLoader object at 0x14754f2a07c0>
-sample_csv_file = '/home/txiao/tmpdir/tmp1uy9aepz.csv'
-
-    def test_load_csv(self, sample_csv_file):
-        """Test loading CSV file."""
->       data = DataLoader.load_csv(sample_csv_file)
-
-tests/test_utils.py:365: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-rl_onoff/utils/data_loader.py:73: in load_csv
-    df = pd.read_csv(file_path, **kwargs)
-/fast/txiao/conda_envs/rlon/lib/python3.10/site-packages/pandas/io/parsers/readers.py:1026: in read_csv
-    return _read(filepath_or_buffer, kwds)
-/fast/txiao/conda_envs/rlon/lib/python3.10/site-packages/pandas/io/parsers/readers.py:620: in _read
-    parser = TextFileReader(filepath_or_buffer, **kwds)
-/fast/txiao/conda_envs/rlon/lib/python3.10/site-packages/pandas/io/parsers/readers.py:1620: in __init__
-    self._engine = self._make_engine(f, self.engine)
-/fast/txiao/conda_envs/rlon/lib/python3.10/site-packages/pandas/io/parsers/readers.py:1898: in _make_engine
-    return mapping[engine](f, **self.options)
-/fast/txiao/conda_envs/rlon/lib/python3.10/site-packages/pandas/io/parsers/c_parser_wrapper.py:93: in __init__
-    self._reader = parsers.TextReader(src, **kwds)
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
->   ???
-E   pandas.errors.EmptyDataError: No columns to parse from file
-
-pandas/_libs/parsers.pyx:581: EmptyDataError
-________________ TestUtilsDataLoader.test_load_csv_with_columns ________________
-
-self = <tests.test_utils.TestUtilsDataLoader object at 0x14754f2a0fa0>
-sample_csv_file = '/home/txiao/tmpdir/tmp8hxv8mny.csv'
-
-    def test_load_csv_with_columns(self, sample_csv_file):
-        """Test loading CSV with specified columns."""
->       data = DataLoader.load_csv(
-            sample_csv_file,
-            question_column="question",
-            solution_column="solution"
-        )
-
-tests/test_utils.py:373: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-rl_onoff/utils/data_loader.py:73: in load_csv
-    df = pd.read_csv(file_path, **kwargs)
-/fast/txiao/conda_envs/rlon/lib/python3.10/site-packages/pandas/io/parsers/readers.py:1026: in read_csv
-    return _read(filepath_or_buffer, kwds)
-/fast/txiao/conda_envs/rlon/lib/python3.10/site-packages/pandas/io/parsers/readers.py:620: in _read
-    parser = TextFileReader(filepath_or_buffer, **kwds)
-/fast/txiao/conda_envs/rlon/lib/python3.10/site-packages/pandas/io/parsers/readers.py:1620: in __init__
-    self._engine = self._make_engine(f, self.engine)
-/fast/txiao/conda_envs/rlon/lib/python3.10/site-packages/pandas/io/parsers/readers.py:1898: in _make_engine
-    return mapping[engine](f, **self.options)
-/fast/txiao/conda_envs/rlon/lib/python3.10/site-packages/pandas/io/parsers/c_parser_wrapper.py:93: in __init__
-    self._reader = parsers.TextReader(src, **kwds)
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
->   ???
-E   pandas.errors.EmptyDataError: No columns to parse from file
-
-pandas/_libs/parsers.pyx:581: EmptyDataError
-_____________ TestUtilsDataLoader.test_load_data_auto_detect_json ______________
-
-self = <tests.test_utils.TestUtilsDataLoader object at 0x14754f2a1480>
-sample_json_file = '/home/txiao/tmpdir/tmpbif3zw_n.json'
-
-    def test_load_data_auto_detect_json(self, sample_json_file):
-        """Test auto-detection of JSON format."""
->       data = load_data(sample_json_file)
-
-tests/test_utils.py:384: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-rl_onoff/utils/data_loader.py:262: in load_data
-    return DataLoader.load_data(
-rl_onoff/utils/data_loader.py:213: in load_data
-    data = DataLoader.load_json(file_path)
-rl_onoff/utils/data_loader.py:35: in load_json
-    return json.load(f)
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/__init__.py:293: in load
-    return loads(fp.read(),
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/__init__.py:346: in loads
-    return _default_decoder.decode(s)
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/decoder.py:337: in decode
-    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
-self = <json.decoder.JSONDecoder object at 0x1476daf95660>, s = '', idx = 0
-
-    def raw_decode(self, s, idx=0):
-        """Decode a JSON document from ``s`` (a ``str`` beginning with
-        a JSON document) and return a 2-tuple of the Python
-        representation and the index in ``s`` where the document ended.
-    
-        This can be used to decode a JSON document from a string that may
-        have extraneous data at the end.
-    
-        """
-        try:
-            obj, end = self.scan_once(s, idx)
-        except StopIteration as err:
->           raise JSONDecodeError("Expecting value", s, err.value) from None
-E           json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
-
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/decoder.py:355: JSONDecodeError
-_____________ TestUtilsDataLoader.test_load_data_auto_detect_jsonl _____________
-
-self = <tests.test_utils.TestUtilsDataLoader object at 0x14754f2a0550>
-sample_jsonl_file = '/home/txiao/tmpdir/tmp_llmxktr.jsonl'
-
-    def test_load_data_auto_detect_jsonl(self, sample_jsonl_file):
-        """Test auto-detection of JSONL format."""
-        data = load_data(sample_jsonl_file)
-        assert isinstance(data, list)
->       assert len(data) == 2
-E       assert 0 == 2
-E        +  where 0 = len([])
-
-tests/test_utils.py:392: AssertionError
-______________ TestUtilsDataLoader.test_load_data_auto_detect_csv ______________
-
-self = <tests.test_utils.TestUtilsDataLoader object at 0x14754f2ada50>
-sample_csv_file = '/home/txiao/tmpdir/tmpgwgyjjyr.csv'
-
-    def test_load_data_auto_detect_csv(self, sample_csv_file):
-        """Test auto-detection of CSV format."""
->       data = load_data(sample_csv_file)
-
-tests/test_utils.py:396: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-rl_onoff/utils/data_loader.py:262: in load_data
-    return DataLoader.load_data(
-rl_onoff/utils/data_loader.py:231: in load_data
-    return DataLoader.load_csv(
-rl_onoff/utils/data_loader.py:73: in load_csv
-    df = pd.read_csv(file_path, **kwargs)
-/fast/txiao/conda_envs/rlon/lib/python3.10/site-packages/pandas/io/parsers/readers.py:1026: in read_csv
-    return _read(filepath_or_buffer, kwds)
-/fast/txiao/conda_envs/rlon/lib/python3.10/site-packages/pandas/io/parsers/readers.py:620: in _read
-    parser = TextFileReader(filepath_or_buffer, **kwds)
-/fast/txiao/conda_envs/rlon/lib/python3.10/site-packages/pandas/io/parsers/readers.py:1620: in __init__
-    self._engine = self._make_engine(f, self.engine)
-/fast/txiao/conda_envs/rlon/lib/python3.10/site-packages/pandas/io/parsers/readers.py:1898: in _make_engine
-    return mapping[engine](f, **self.options)
-/fast/txiao/conda_envs/rlon/lib/python3.10/site-packages/pandas/io/parsers/c_parser_wrapper.py:93: in __init__
-    self._reader = parsers.TextReader(src, **kwds)
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
->   ???
-E   pandas.errors.EmptyDataError: No columns to parse from file
-
-pandas/_libs/parsers.pyx:581: EmptyDataError
-______________ TestUtilsIntegration.test_all_purposes_with_utils _______________
-
-self = <tests.test_utils.TestUtilsIntegration object at 0x14754f2a0eb0>
-sample_json_file = '/home/txiao/tmpdir/tmp9mlqzkaw.json'
-mock_backend = MockBackend(model_name=mock_model)
-mock_backend_b = MockBackend(model_name=mock_model_b)
-
-    def test_all_purposes_with_utils(self, sample_json_file, mock_backend, mock_backend_b):
-        """Test all four purposes with utils (data loading and config)."""
-        # Load data using utils
->       data = load_data(sample_json_file)
-
-tests/test_utils.py:423: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-rl_onoff/utils/data_loader.py:262: in load_data
-    return DataLoader.load_data(
-rl_onoff/utils/data_loader.py:213: in load_data
-    data = DataLoader.load_json(file_path)
-rl_onoff/utils/data_loader.py:35: in load_json
-    return json.load(f)
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/__init__.py:293: in load
-    return loads(fp.read(),
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/__init__.py:346: in loads
-    return _default_decoder.decode(s)
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/decoder.py:337: in decode
-    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
-self = <json.decoder.JSONDecoder object at 0x1476daf95660>, s = '', idx = 0
-
-    def raw_decode(self, s, idx=0):
-        """Decode a JSON document from ``s`` (a ``str`` beginning with
-        a JSON document) and return a 2-tuple of the Python
-        representation and the index in ``s`` where the document ended.
-    
-        This can be used to decode a JSON document from a string that may
-        have extraneous data at the end.
-    
-        """
-        try:
-            obj, end = self.scan_once(s, idx)
-        except StopIteration as err:
->           raise JSONDecodeError("Expecting value", s, err.value) from None
-E           json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
-
-/fast/txiao/conda_envs/rlon/lib/python3.10/json/decoder.py:355: JSONDecodeError
+        if not self.call_count == 1:
+            msg = ("Expected '%s' to have been called once. Called %s times.%s"
+                   % (self._mock_name or 'mock',
+                      self.call_count,
+                      self._calls_repr()))
+>           raise AssertionError(msg)
+E           AssertionError: Expected 'HuggingFaceBackend' to have been called once. Called 0 times.
+
+/fast/txiao/conda_envs/rlon/lib/python3.10/unittest/mock.py:908: AssertionError
 =========================== short test summary info ============================
-FAILED tests/test_utils.py::TestUtilsSamplingAndMetrics::test_data_loader_with_sampling
-FAILED tests/test_utils.py::TestUtilsSamplingAndMetrics::test_data_loader_with_metrics
-FAILED tests/test_utils.py::TestUtilsDistributionExtraction::test_data_loader_for_distribution_extraction
-FAILED tests/test_utils.py::TestUtilsDivergenceCalculation::test_data_loader_for_divergence
-FAILED tests/test_utils.py::TestUtilsModelSwitching::test_data_loader_for_switching
-FAILED tests/test_utils.py::TestUtilsDataLoader::test_load_json - json.decode...
-FAILED tests/test_utils.py::TestUtilsDataLoader::test_load_jsonl - assert 0 == 2
-FAILED tests/test_utils.py::TestUtilsDataLoader::test_load_csv - pandas.error...
-FAILED tests/test_utils.py::TestUtilsDataLoader::test_load_csv_with_columns
-FAILED tests/test_utils.py::TestUtilsDataLoader::test_load_data_auto_detect_json
-FAILED tests/test_utils.py::TestUtilsDataLoader::test_load_data_auto_detect_jsonl
-FAILED tests/test_utils.py::TestUtilsDataLoader::test_load_data_auto_detect_csv
-FAILED tests/test_utils.py::TestUtilsIntegration::test_all_purposes_with_utils
-======================== 13 failed, 10 passed in 20.30s ========================
+FAILED tests/test_backends.py::TestBackendsBase::test_get_backend_function - ...
+======================== 1 failed, 14 passed in 19.42s =========================
