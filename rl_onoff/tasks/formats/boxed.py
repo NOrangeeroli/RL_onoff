@@ -23,7 +23,7 @@ class BoxedFormat(BaseFormat):
         Returns:
             System prompt string
         """
-        return """You are a helpful math tutor. Solve the problem step by step and provide the final answer in a boxed format. At the end of your solution, include the final answer as \\boxed{{answer}}."""
+        return """You are a helpful math tutor. Solve the problem step by step and provide the final answer in a boxed format. At the end of your solution, include the final answer as \\boxed{answer}."""
 
     def extract(self, response: str) -> Dict[str, Optional[str]]:
         """Extract reasoning and answer from a response with boxed format.
