@@ -57,12 +57,11 @@ def main(
         questions = [question]
     elif dataset:
         click.echo(f"Loading dataset from {dataset}...")
-        data = load_data(
-            dataset,
-            question_column=question_column or 'question',
-            solution_column=None,
-        )
-        questions = [item['question'] for item in data]
+        data = load_data(dataset)
+        
+        # Extract questions using specified column name
+        question_col = question_column or 'question'
+        questions = [item.get(question_col, '') for item in data]
     else:
         raise click.BadParameter("Either --dataset or --question must be provided")
     

@@ -383,13 +383,9 @@ class TestUtilsDataLoader:
         assert "question" in data[0]
         assert "solution" in data[0]
     
-    def test_load_csv_with_columns(self, sample_csv_file):
-        """Test loading CSV with specified columns."""
-        data = DataLoader.load_csv(
-            sample_csv_file,
-            question_column="question",
-            solution_column="solution"
-        )
+    def test_load_csv_preserves_columns(self, sample_csv_file):
+        """Test loading CSV preserves all columns."""
+        data = DataLoader.load_csv(sample_csv_file)
         assert len(data) == 2
         assert "question" in data[0]
         assert "solution" in data[0]

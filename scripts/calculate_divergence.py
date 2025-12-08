@@ -45,14 +45,13 @@ def main(
     
     # Load dataset
     click.echo(f"Loading dataset from {dataset}...")
-    data = load_data(
-        dataset,
-        question_column=question_column or 'question',
-        solution_column=solution_column or 'solution',
-    )
+    data = load_data(dataset)
     
-    questions = [item['question'] for item in data]
-    solutions = [item.get('solution', '') for item in data]
+    # Extract questions and solutions using specified column names
+    question_col = question_column or 'question'
+    solution_col = solution_column or 'solution'
+    questions = [item.get(question_col, '') for item in data]
+    solutions = [item.get(solution_col, '') for item in data]
     
     # Initialize backends
     click.echo(f"Loading model A: {backend_type_a} backend with {model_name_a}...")
