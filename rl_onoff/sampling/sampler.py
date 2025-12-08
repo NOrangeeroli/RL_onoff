@@ -113,3 +113,109 @@ class Sampler:
         
         return results
 
+
+if __name__ == "__main__":
+    """Simple use cases for Sampler."""
+    
+    try:
+        from rl_onoff.backends import HuggingFaceBackend
+        
+        print("Running Sampler examples...")
+        print("=" * 60)
+        
+        # Initialize backend (using a small model for demonstration)
+        model_name = "gpt2"  # Replace with your preferred model
+        backend = HuggingFaceBackend(model_name=model_name)
+        
+        # Create sampler
+        sampler = Sampler(backend)
+        print(f"Sampler initialized with backend: {model_name}\n")
+        
+        # Example 1: Basic single prompt sampling
+        print("=" * 60)
+        print("Example 1: Basic single prompt sampling")
+        print("=" * 60)
+        prompt = "The future of artificial intelligence is"
+        result = sampler.sample(prompt, config=SamplingConfig(max_new_tokens=20))
+        print(f"Prompt: {prompt}")
+        print(f"Generated: {result}\n")
+        
+        # Example 2: Multiple prompts
+        print("=" * 60)
+        print("Example 2: Multiple prompts")
+        print("=" * 60)
+        prompts = [
+            "Python is a programming language that",
+            "Machine learning is"
+        ]
+        results = sampler.sample(prompts, config=SamplingConfig(max_new_tokens=15))
+        for prompt, result in zip(prompts, results):
+            print(f"Prompt: {prompt}")
+            print(f"Generated: {result}\n")
+        
+        # Example 3: Using SamplingConfig with custom parameters
+        print("=" * 60)
+        print("Example 3: Custom SamplingConfig (temperature, top_k, top_p)")
+        print("=" * 60)
+        config = SamplingConfig(
+            max_new_tokens=20,
+            temperature=0.7,
+            top_k=50,
+            top_p=0.9,
+            do_sample=True
+        )
+        result = sampler.sample("The best way to learn programming is", config=config)
+        print(f"Prompt: The best way to learn programming is")
+        print(f"Generated (temp=0.7, top_k=50, top_p=0.9): {result}\n")
+        
+        # Example 4: Multiple samples per prompt
+        print("=" * 60)
+        print("Example 4: Multiple samples per prompt")
+        print("=" * 60)
+        config = SamplingConfig(max_new_tokens=15, num_samples=3)
+        results = sampler.sample("Once upon a time", config=config)
+        print(f"Prompt: Once upon a time")
+        print(f"Generated {config.num_samples} samples:")
+        for i, sample in enumerate(results, 1):
+            print(f"  Sample {i}: {sample}")
+        print()
+        
+        # Example 5: Batch sampling
+        print("=" * 60)
+        print("Example 5: Batch sampling with batch_size")
+        print("=" * 60)
+        prompts = [
+            "The capital of France is",
+            "The capital of Japan is",
+            "The capital of Brazil is",
+            "The capital of Australia is"
+        ]
+        results = sampler.sample_batch(
+            prompts,
+            config=SamplingConfig(max_new_tokens=10),
+            batch_size=2  # Process 2 prompts at a time
+        )
+        for prompt, result in zip(prompts, results):
+            print(f"Prompt: {prompt}")
+            print(f"Generated: {result}\n")
+        
+        # Example 6: Deterministic sampling (greedy decoding)
+        print("=" * 60)
+        print("Example 6: Deterministic sampling (do_sample=False)")
+        print("=" * 60)
+        config = SamplingConfig(max_new_tokens=15, do_sample=False)
+        result = sampler.sample("The answer to life, the universe, and everything is", config=config)
+        print(f"Prompt: The answer to life, the universe, and everything is")
+        print(f"Generated (deterministic): {result}\n")
+        
+        print("=" * 60)
+        print("All examples completed successfully!")
+        print("=" * 60)
+        
+    except ImportError as e:
+        print(f"Import error: {e}")
+        print("Please ensure HuggingFace backend is available.")
+    except Exception as e:
+        print(f"\nAn error occurred during Sampler examples: {e}")
+        print("Please ensure you have a compatible model and sufficient resources.")
+

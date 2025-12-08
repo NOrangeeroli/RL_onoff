@@ -21,7 +21,7 @@ This directory contains Conda environment files and corresponding pip requiremen
 
 ### Creating a Conda Environment
 
-1. Create the environment from the YAML file:
+1. Create the environment from the YAML file (run from project root):
    ```bash
    conda env create -f envs/environment_huggingface.yml
    ```
@@ -38,13 +38,30 @@ This directory contains Conda environment files and corresponding pip requiremen
 
 ### Available Environments
 
-- **HuggingFace**: `conda env create -f envs/environment_huggingface.yml` → `conda activate rl_onoff_hf`
-- **vLLM**: `conda env create -f envs/environment_vllm.yml` → `conda activate rl_onoff_vllm`
-- **SGLang**: `conda env create -f envs/environment_sglang.yml` → `conda activate rl_onoff_sglang`
+#### HuggingFace Backend
+```bash
+conda env create -f envs/environment_huggingface.yml
+conda activate rl_onoff_hf
+pip install -r envs/requirements_huggingface.txt
+```
+
+#### vLLM Backend
+```bash
+conda env create -f envs/environment_vllm.yml
+conda activate rl_onoff_vllm
+pip install -r envs/requirements_vllm.txt
+```
+
+#### SGLang Backend
+```bash
+conda env create -f envs/environment_sglang.yml
+conda activate rl_onoff_sglang
+pip install -r envs/requirements_sglang.txt
+```
 
 ## Notes
 
-- Pip packages are separated from Conda environment files to speed up environment creation
-- After creating the environment, always install the corresponding requirements file
-- Each backend has specific version requirements (especially PyTorch and CUDA), so use the correct environment file
-
+- **Pip packages are separated**: Pip packages are in separate requirements files to speed up conda environment creation. Always install the corresponding requirements file after creating the environment.
+- **Version requirements**: Each backend has specific version requirements (especially PyTorch and CUDA), so use the correct environment file for your backend.
+- **CUDA compatibility**: If you encounter CUDA-related errors during environment creation, you may need to remove or adjust the CUDA packages in the YAML files based on your system's CUDA installation.
+- **Run from project root**: All commands should be run from the project root directory (where the `envs/` folder is located).
