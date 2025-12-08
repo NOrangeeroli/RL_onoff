@@ -149,7 +149,7 @@ if __name__ == "__main__":
         
         # Initialize backend (replace with your preferred model)
         backend = VLLMBackend(
-            model_name="meta-llama/Meta-Llama-3.1-8B-Instruct",  # Replace with your model
+            model_name="meta-llama/Llama-3.2-1B",  # Replace with your model
             tensor_parallel_size=1,
             gpu_memory_utilization=0.9
         )
