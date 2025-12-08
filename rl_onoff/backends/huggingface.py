@@ -254,7 +254,7 @@ if __name__ == "__main__":
     logits = backend.get_logits("The answer is", max_new_tokens=1)
     print(f"Logits shape: {logits.shape}")
     print(f"Vocabulary size: {logits.shape[-1]}")
-    print(f"Top 5 token probabilities: {logits[0][:5]}\n")
+    print(f"Top 5 token logits: {logits[0][:5]}\n")
     
     # Example 5: Get probability distributions
     print("=" * 60)

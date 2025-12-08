@@ -52,7 +52,7 @@ outlines-core==0.1.26  # Required by outlines
 #   pip install torch==2.5.1 torchvision==0.20.1 vllm==0.6.5
 # - xformers 0.0.28.post3 also requires torch==2.5.1
 # - Consider using a newer vLLM version that supports newer torch versions, or downgrade torch
-vllm>=0.2.0  # Uncomment if using vLLM backend (see notes above about version conflicts)
+# vllm>=0.2.0  # Uncomment if using vLLM backend (see notes above about version conflicts)
 
 # SGLang installation notes:
 # - To install with compiled kernels (required for runtime): pip install 'sglang[all]'
@@ -61,7 +61,7 @@ vllm>=0.2.0  # Uncomment if using vLLM backend (see notes above about version co
 #   2. Or build from source: git clone https://github.com/sgl-project/sglang.git && cd sglang && pip install -e ".[all]"
 #   3. Ensure CUDA toolkit and compatible PyTorch with CUDA support are installed
 #   4. Check environment: python -m sglang.check_env
-sglang>=0.1.0  # Uncomment if using SGLang backend (install with: pip install 'sglang[all]')
+# sglang>=0.1.0  # Uncomment if using SGLang backend (install with: pip install 'sglang[all]')
 
 # Platform-specific packages (may not be available on all platforms)
 ninja>=1.11.1.1  # Build tool, may not be supported on all platforms
