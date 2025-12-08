@@ -142,98 +142,87 @@ if __name__ == "__main__":
         print("vLLM is not installed. Install it with: pip install vllm")
         print("Skipping examples.")
     else:
-        try:
-            # Example 1: Basic text generation
-            print("=" * 60)
-            print("Example 1: Basic text generation")
-            print("=" * 60)
-            
-            # Initialize backend (replace with your preferred model)
-            backend = VLLMBackend(
-                model_name="meta-llama/Llama-3.2-1B",  # Replace with your model
-                tensor_parallel_size=1,
-                gpu_memory_utilization=0.9
-            )
-            
-            # Generate text from a single prompt
-            prompt = "The future of AI is"
-            generated = backend.generate(
-                prompt,
-                max_new_tokens=20,
-                temperature=0.7,
-                do_sample=True
-            )
-            print(f"Prompt: {prompt}")
-            print(f"Generated: {generated}\n")
-            
-            # Example 2: Generate from multiple prompts
-            print("=" * 60)
-            print("Example 2: Generate from multiple prompts")
-            print("=" * 60)
-            
-            prompts = [
-                "Python is",
-                "Machine learning is"
-            ]
-            generated_texts = backend.generate(
-                prompts,
-                max_new_tokens=15,
-                temperature=0.8,
-                top_k=50,
-                top_p=0.9
-            )
-            for prompt, text in zip(prompts, generated_texts):
-                print(f"Prompt: {prompt}")
-                print(f"Generated: {text}\n")
-            
-            # Example 3: Encode and decode text
-            print("=" * 60)
-            print("Example 3: Encode and decode text")
-            print("=" * 60)
-            
-            tokenizer = backend.get_tokenizer()
-            if tokenizer is not None:
-                text = "Hello, world!"
-                token_ids = backend.encode(text)
-                print(f"Text: {text}")
-                print(f"Token IDs: {token_ids}")
-                
-                decoded = backend.decode(token_ids)
-                print(f"Decoded: {decoded}\n")
-            else:
-                print("Tokenizer not available (llm_engine not accessible)\n")
-            
-            # Example 4: Get logits (Note: Not implemented for vLLM)
-            print("=" * 60)
-            print("Example 4: Get logits (Not implemented for vLLM)")
-            print("=" * 60)
-            
-            try:
-                logits = backend.get_logits("The answer is", max_new_tokens=1)
-                print(f"Logits shape: {logits.shape}")
-            except NotImplementedError as e:
-                print(f"Note: {e}\n")
-            
-            # Example 5: Access tokenizer directly
-            print("=" * 60)
-            print("Example 5: Access tokenizer directly")
-            print("=" * 60)
-            
-            tokenizer = backend.get_tokenizer()
-            if tokenizer is not None:
-                print(f"Tokenizer: {type(tokenizer).__name__}")
-                if hasattr(tokenizer, 'vocab_size'):
-                    print(f"Vocabulary size: {tokenizer.vocab_size}\n")
-            else:
-                print("Tokenizer not available (llm_engine not accessible)\n")
+        # Example 1: Basic text generation
+        print("=" * 60)
+        print("Example 1: Basic text generation")
+        print("=" * 60)
         
-        except (ImportError, ModuleNotFoundError, RuntimeError, AttributeError, OSError) as e:
-            print(f"\nError: vLLM runtime is not properly configured.")
-            print(f"Details: {e}")
-            print("\nNote: vLLM may require additional setup:")
-            print("  - Ensure CUDA and compatible GPU drivers are installed")
-            print("  - Check that vLLM is properly installed: pip install vllm")
-            print("  - Some models may require specific CUDA versions")
-            print("  - Check vLLM documentation for installation requirements")
-            print("\nSkipping examples due to configuration issues.")
+        # Initialize backend (replace with your preferred model)
+        backend = VLLMBackend(
+            model_name="meta-llama/Llama-3.2-1B",  # Replace with your model
+            tensor_parallel_size=1,
+            gpu_memory_utilization=0.9
+        )
+        
+        # Generate text from a single prompt
+        prompt = "The future of AI is"
+        generated = backend.generate(
+            prompt,
+            max_new_tokens=20,
+            temperature=0.7,
+            do_sample=True
+        )
+        print(f"Prompt: {prompt}")
+        print(f"Generated: {generated}\n")
+        
+        # Example 2: Generate from multiple prompts
+        print("=" * 60)
+        print("Example 2: Generate from multiple prompts")
+        print("=" * 60)
+        
+        prompts = [
+            "Python is",
+            "Machine learning is"
+        ]
+        generated_texts = backend.generate(
+            prompts,
+            max_new_tokens=15,
+            temperature=0.8,
+            top_k=50,
+            top_p=0.9
+        )
+        for prompt, text in zip(prompts, generated_texts):
+            print(f"Prompt: {prompt}")
+            print(f"Generated: {text}\n")
+        
+        # Example 3: Encode and decode text
+        print("=" * 60)
+        print("Example 3: Encode and decode text")
+        print("=" * 60)
+        
+        tokenizer = backend.get_tokenizer()
+        if tokenizer is not None:
+            text = "Hello, world!"
+            token_ids = backend.encode(text)
+            print(f"Text: {text}")
+            print(f"Token IDs: {token_ids}")
+            
+            decoded = backend.decode(token_ids)
+            print(f"Decoded: {decoded}\n")
+        else:
+            print("Tokenizer not available (llm_engine not accessible)\n")
+        
+        # Example 4: Get logits (Note: Not implemented for vLLM)
+        print("=" * 60)
+        print("Example 4: Get logits (Not implemented for vLLM)")
+        print("=" * 60)
+        
+        try:
+            logits = backend.get_logits("The answer is", max_new_tokens=1)
+            print(f"Logits shape: {logits.shape}")
+        except NotImplementedError as e:
+            print(f"Note: {e}\n")
+        
+        # Example 5: Access tokenizer directly
+        print("=" * 60)
+        print("Example 5: Access tokenizer directly")
+        print("=" * 60)
+        
+        tokenizer = backend.get_tokenizer()
+        if tokenizer is not None:
+            print(f"Tokenizer: {type(tokenizer).__name__}")
+            if hasattr(tokenizer, 'vocab_size'):
+                print(f"Vocabulary size: {tokenizer.vocab_size}\n")
+        else:
+            print("Tokenizer not available (llm_engine not accessible)\n")
 
