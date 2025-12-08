@@ -1,7 +1,7 @@
 # Core dependencies
 torch>=2.0.0
 transformers>=4.30.0
-numpy>=1.24.0
+numpy>=1.24.0,<2.0.0  # Constrained for llamafactory compatibility
 scipy>=1.10.0
 pandas>=2.0.0
 datasets>=2.14.0
@@ -13,6 +13,24 @@ click>=8.1.0
 # Metrics dependencies
 nltk>=3.8.0
 rouge-score>=0.1.2
+
+# Additional dependencies for various packages
+colorama>=0.2.5,<0.4.7  # Required by awscli and sacrebleu
+webencodings>=0.5.0  # Required by bleach
+scikit-learn>=1.1.0  # Required by librosa and sentence-transformers
+cycler>=0.10  # Required by matplotlib
+fonttools>=4.22.0  # Required by matplotlib
+kiwisolver>=1.3.1  # Required by matplotlib
+nest_asyncio>=1.5.0  # Required by outlines
+tenacity>=6.2.0  # Required by plotly
+lxml>=4.0.0  # Required by sacrebleu
+markdown>=2.6.8  # Required by tensorboard
+
+# Version constraints for compatibility
+pydantic<=2.10.6  # Required by llamafactory
+trl>=0.8.6,<=0.9.6  # Required by llamafactory
+lark>=1.1.5,<1.2.0  # Required by pddl
+outlines-core==0.1.26  # Required by outlines
 
 # Optional backends
 vllm>=0.2.0  # Uncomment if using vLLM backend
