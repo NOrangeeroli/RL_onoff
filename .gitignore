@@ -49,7 +49,6 @@ htmlcov/
 *.pth
 *.ckpt
 models/
-data/
 *.h5
 
 # Logs
