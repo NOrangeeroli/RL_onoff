@@ -24,7 +24,7 @@ except ImportError:
     BLEU_AVAILABLE = False
 
 try:
-    from math_verify import verify
+    from math_verify import parse, verify
     MATH_VERIFY_AVAILABLE = True
 except ImportError:
     MATH_VERIFY_AVAILABLE = False
@@ -341,13 +341,17 @@ class MathVerifyReward(BaseReward):
             verified = False
             for ref in refs:
                 try:
-                    # Use math_verify to check equivalence
-                    result = verify(pred_answer, ref)
+                    # Parse both gold (reference) and answer (prediction) first
+                    gold_parsed = parse(ref.strip())
+                    answer_parsed = parse(pred_answer)
+                    
+                    # Verify: order is important! verify(gold, answer)
+                    result = verify(gold_parsed, answer_parsed)
                     if result:
                         verified = True
                         break
                 except Exception as e:
-                    # If verification fails, continue to next reference
+                    # If parsing or verification fails, continue to next reference
                     continue
             
             scores.append(1.0 if verified else 0.0)
@@ -364,7 +368,7 @@ if __name__ == "__main__":
         # Create a MathVerifyReward instance
         reward = MathVerifyReward()
         
-        # Example 1: Single prediction and reference
+        # Example 1: Single prediction and reference (exact match)
         print("\nExample 1: Single answer verification")
         prediction = "42"
         reference = "42"
@@ -373,17 +377,26 @@ if __name__ == "__main__":
         print(f"Reference: {reference}")
         print(f"Score: {score}")
         
-        # Example 2: Different but equivalent expressions
-        print("\nExample 2: Equivalent expressions")
-        prediction = "2 + 2"
-        reference = "4"
+        # Example 2: Equivalent set expressions
+        print("\nExample 2: Equivalent set expressions")
+        prediction = "${1,2,3,4}$"
+        reference = "${1,3} \\cup {2,4}$"
         score = reward.compute(prediction, reference)
         print(f"Prediction: {prediction}")
         print(f"Reference: {reference}")
         print(f"Score: {score}")
         
-        # Example 3: Multiple predictions and references
-        print("\nExample 3: Multiple answers")
+        # Example 3: Equivalent arithmetic expressions
+        print("\nExample 3: Equivalent arithmetic expressions")
+        prediction = "4"
+        reference = "2 + 2"
+        score = reward.compute(prediction, reference)
+        print(f"Prediction: {prediction}")
+        print(f"Reference: {reference}")
+        print(f"Score: {score}")
+        
+        # Example 4: Multiple predictions and references
+        print("\nExample 4: Multiple answers")
         predictions = ["10", "15", "20"]
         references = ["5 * 2", "3 * 5", "4 * 5"]
         scores = reward.compute(predictions, references)
@@ -391,8 +404,8 @@ if __name__ == "__main__":
         print(f"References: {references}")
         print(f"Scores: {scores}")
         
-        # Example 4: Incorrect answer
-        print("\nExample 4: Incorrect answer")
+        # Example 5: Incorrect answer
+        print("\nExample 5: Incorrect answer")
         prediction = "5"
         reference = "10"
         score = reward.compute(prediction, reference)
