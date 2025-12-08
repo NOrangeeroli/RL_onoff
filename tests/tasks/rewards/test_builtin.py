@@ -102,19 +102,15 @@ class TestMathVerifyReward:
     
     def test_compute_without_math_verify(self):
         """Test compute when math_verify is not available."""
-        # Patch the module-level constant before creating the reward
-        original_value = builtin.MATH_VERIFY_AVAILABLE
-        try:
-            builtin.MATH_VERIFY_AVAILABLE = False
-            # Reload the module to pick up the change
-            importlib.reload(builtin)
-            # Now creating MathVerifyReward should raise ImportError
+        # Skip this test if math_verify is actually not available (can't test the error case)
+        if not builtin.MATH_VERIFY_AVAILABLE:
+            pytest.skip("math_verify is not available, cannot test error handling")
+        
+        # Use patch to temporarily set MATH_VERIFY_AVAILABLE to False
+        with patch.object(builtin, 'MATH_VERIFY_AVAILABLE', False):
+            # The class checks MATH_VERIFY_AVAILABLE in __init__, so this should work
             with pytest.raises(ImportError, match="math_verify is not installed"):
                 reward = builtin.MathVerifyReward()
-        finally:
-            # Restore original value and reload
-            builtin.MATH_VERIFY_AVAILABLE = original_value
-            importlib.reload(builtin)
     
     def test_extract_answer_from_text(self):
         """Test _extract_answer method."""
