@@ -138,80 +138,90 @@ if __name__ == "__main__":
         print("SGLang is not installed. Install it with: pip install 'sglang[all]'")
         print("Skipping examples.")
     else:
-        # Example 1: Basic text generation
-        print("=" * 60)
-        print("Example 1: Basic text generation")
-        print("=" * 60)
-        
-        # Initialize backend (replace with your preferred model)
-        backend = SGLangBackend(
-            model_name="meta-llama/Llama-3.2-1B",  # Replace with your model
-            tp_size=1,
-            mem_fraction_static=0.85
-        )
-        
-        # Generate text from a single prompt
-        prompt = "The future of AI is"
-        generated = backend.generate(
-            prompt,
-            max_new_tokens=20,
-            temperature=0.7,
-            do_sample=True
-        )
-        print(f"Prompt: {prompt}")
-        print(f"Generated: {generated}\n")
-        
-        # Example 2: Generate from multiple prompts
-        print("=" * 60)
-        print("Example 2: Generate from multiple prompts")
-        print("=" * 60)
-        
-        prompts = [
-            "Python is",
-            "Machine learning is"
-        ]
-        generated_texts = backend.generate(
-            prompts,
-            max_new_tokens=15,
-            temperature=0.8,
-            top_k=50,
-            top_p=0.9
-        )
-        for prompt, text in zip(prompts, generated_texts):
-            print(f"Prompt: {prompt}")
-            print(f"Generated: {text}\n")
-        
-        # Example 3: Encode and decode text
-        print("=" * 60)
-        print("Example 3: Encode and decode text")
-        print("=" * 60)
-        
-        text = "Hello, world!"
-        token_ids = backend.encode(text)
-        print(f"Text: {text}")
-        print(f"Token IDs: {token_ids}")
-        
-        decoded = backend.decode(token_ids)
-        print(f"Decoded: {decoded}\n")
-        
-        # Example 4: Get logits (Note: Not implemented for SGLang)
-        print("=" * 60)
-        print("Example 4: Get logits (Not implemented for SGLang)")
-        print("=" * 60)
-        
         try:
-            logits = backend.get_logits("The answer is", max_new_tokens=1)
-            print(f"Logits shape: {logits.shape}")
-        except NotImplementedError as e:
-            print(f"Note: {e}\n")
+            # Example 1: Basic text generation
+            print("=" * 60)
+            print("Example 1: Basic text generation")
+            print("=" * 60)
+            
+            # Initialize backend (replace with your preferred model)
+            backend = SGLangBackend(
+                model_name="meta-llama/Llama-3.2-1B",  # Replace with your model
+                tp_size=1,
+                mem_fraction_static=0.85
+            )
+            
+            # Generate text from a single prompt
+            prompt = "The future of AI is"
+            generated = backend.generate(
+                prompt,
+                max_new_tokens=20,
+                temperature=0.7,
+                do_sample=True
+            )
+            print(f"Prompt: {prompt}")
+            print(f"Generated: {generated}\n")
+            
+            # Example 2: Generate from multiple prompts
+            print("=" * 60)
+            print("Example 2: Generate from multiple prompts")
+            print("=" * 60)
+            
+            prompts = [
+                "Python is",
+                "Machine learning is"
+            ]
+            generated_texts = backend.generate(
+                prompts,
+                max_new_tokens=15,
+                temperature=0.8,
+                top_k=50,
+                top_p=0.9
+            )
+            for prompt, text in zip(prompts, generated_texts):
+                print(f"Prompt: {prompt}")
+                print(f"Generated: {text}\n")
+            
+            # Example 3: Encode and decode text
+            print("=" * 60)
+            print("Example 3: Encode and decode text")
+            print("=" * 60)
+            
+            text = "Hello, world!"
+            token_ids = backend.encode(text)
+            print(f"Text: {text}")
+            print(f"Token IDs: {token_ids}")
+            
+            decoded = backend.decode(token_ids)
+            print(f"Decoded: {decoded}\n")
+            
+            # Example 4: Get logits (Note: Not implemented for SGLang)
+            print("=" * 60)
+            print("Example 4: Get logits (Not implemented for SGLang)")
+            print("=" * 60)
+            
+            try:
+                logits = backend.get_logits("The answer is", max_new_tokens=1)
+                print(f"Logits shape: {logits.shape}")
+            except NotImplementedError as e:
+                print(f"Note: {e}\n")
+            
+            # Example 5: Access tokenizer directly
+            print("=" * 60)
+            print("Example 5: Access tokenizer directly")
+            print("=" * 60)
+            
+            tokenizer = backend.get_tokenizer()
+            print(f"Tokenizer: {type(tokenizer).__name__}")
+            if hasattr(tokenizer, 'vocab_size'):
+                print(f"Vocabulary size: {tokenizer.vocab_size}\n")
         
-        # Example 5: Access tokenizer directly
-        print("=" * 60)
-        print("Example 5: Access tokenizer directly")
-        print("=" * 60)
-        
-        tokenizer = backend.get_tokenizer()
-        print(f"Tokenizer: {type(tokenizer).__name__}")
-        if hasattr(tokenizer, 'vocab_size'):
-            print(f"Vocabulary size: {tokenizer.vocab_size}\n")
+        except (ImportError, ModuleNotFoundError, RuntimeError, AttributeError) as e:
+            print(f"\nError: SGLang runtime is not properly configured.")
+            print(f"Details: {e}")
+            print("\nNote: SGLang may require additional setup:")
+            print("  - Ensure all dependencies are installed: pip install 'sglang[all]'")
+            print("  - Some SGLang features require compiled kernels (sgl_kernel)")
+            print("  - Check SGLang documentation for installation requirements")
+            print("\nSkipping examples due to configuration issues.")
 
