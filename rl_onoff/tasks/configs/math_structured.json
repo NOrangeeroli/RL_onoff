@@ -1,5 +1,5 @@
 {
-  "template_type": "simple",
+  "template_type": "chatml",
   "reward_type": "math_verify",
   "format_type": "structured",
   "template_kwargs": {},
