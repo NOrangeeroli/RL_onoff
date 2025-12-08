@@ -129,58 +129,74 @@ class HuggingFaceBackend(BaseBackend):
     def get_logits(
         self,
         prompts: Union[str, List[str]],
-        max_new_tokens: int = 1,
+        responses: Union[str, List[str]],
         **kwargs
     ) -> Union[np.ndarray, List[np.ndarray]]:
-        """Get token logits for given prompts."""
+        """Get token logits for predicting response tokens given prompts."""
         if not self._is_loaded:
             self.load()
 
         is_single = isinstance(prompts, str)
         if is_single:
             prompts = [prompts]
+            responses = [responses]
+        
+        if len(prompts) != len(responses):
+            raise ValueError(f"Number of prompts ({len(prompts)}) must match number of responses ({len(responses)})")
 
-        # Tokenize inputs
-        inputs = self.tokenizer(
+        # Concatenate prompts and responses
+        full_texts = [prompt + response for prompt, response in zip(prompts, responses)]
+        
+        # Tokenize full texts (prompt + solution)
+        full_inputs = self.tokenizer(
+            full_texts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+        )
+        full_inputs = {k: v.to(self.device) for k, v in full_inputs.items()}
+
+        # Tokenize prompts separately to get prompt lengths
+        prompt_inputs = self.tokenizer(
             prompts,
             return_tensors="pt",
             padding=True,
             truncation=True,
         )
-        inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        prompt_inputs = {k: v.to(self.device) for k, v in prompt_inputs.items()}
+        prompt_lengths = prompt_inputs["input_ids"].shape[1]
 
         all_logits = []
         
         with torch.no_grad():
-            # Get initial logits
-            outputs = self.model(**inputs)
-            current_logits = outputs.logits  # (batch_size, seq_len, vocab_size)
+            # Get logits for the full sequence
+            outputs = self.model(**full_inputs)
+            logits = outputs.logits  # (batch_size, seq_len, vocab_size)
             
-            # Get logits for each new token position
-            generated_ids = inputs["input_ids"].clone()
-            
-            for _ in range(max_new_tokens):
-                # Get logits for the last token position
-                next_token_logits = current_logits[:, -1:, :]  # (batch_size, 1, vocab_size)
-                all_logits.append(next_token_logits.cpu().numpy())
+            # Extract logits for solution tokens only
+            # Logits at position i predict token at position i+1
+            # So for solution starting after prompt, we need logits at positions
+            # that predict each solution token
+            for i in range(len(prompts)):
+                # Get actual prompt length (excluding padding)
+                prompt_len = (prompt_inputs["input_ids"][i] != self.tokenizer.pad_token_id).sum().item()
+                if self.tokenizer.pad_token_id is None:
+                    prompt_len = prompt_lengths
                 
-                # Sample next token (greedy for simplicity)
-                next_token_ids = torch.argmax(next_token_logits, dim=-1)
-                generated_ids = torch.cat([generated_ids, next_token_ids], dim=-1)
+                # Get the actual sequence length for this item (excluding padding)
+                seq_len = (full_inputs["input_ids"][i] != self.tokenizer.pad_token_id).sum().item()
+                if self.tokenizer.pad_token_id is None:
+                    seq_len = full_inputs["input_ids"].shape[1]
                 
-                # Get logits for next position
-                if _ < max_new_tokens - 1:
-                    outputs = self.model(generated_ids)
-                    current_logits = outputs.logits
+                # Logits for response tokens: positions [prompt_len-1, prompt_len, ..., seq_len-2]
+                # These predict tokens at positions [prompt_len, prompt_len+1, ..., seq_len-1]
+                # We want logits that predict each response token
+                response_logits = logits[i, prompt_len-1:seq_len-1, :]  # (response_len, vocab_size)
+                all_logits.append(response_logits.cpu().numpy())
 
-        # Concatenate logits along sequence dimension
-        # all_logits is list of (batch_size, 1, vocab_size)
-        # We want (batch_size, max_new_tokens, vocab_size)
-        batch_logits = np.concatenate(all_logits, axis=1)  # (batch_size, max_new_tokens, vocab_size)
-        
         if is_single:
-            return batch_logits[0]  # (max_new_tokens, vocab_size)
-        return [batch_logits[i] for i in range(batch_logits.shape[0])]
+            return all_logits[0]  # (response_len, vocab_size)
+        return all_logits
 
     def get_tokenizer(self):
         """Get the tokenizer instance."""
@@ -246,22 +262,29 @@ if __name__ == "__main__":
     decoded = backend.decode(token_ids)
     print(f"Decoded: {decoded}\n")
     
-    # Example 4: Get logits for a prompt
+    # Example 4: Get logits for predicting solution tokens
     print("=" * 60)
-    print("Example 4: Get logits for a prompt")
+    print("Example 4: Get logits for predicting solution tokens")
     print("=" * 60)
     
-    logits = backend.get_logits("The answer is", max_new_tokens=1)
+    prompt = "The answer is"
+    response = " 42."
+    logits = backend.get_logits(prompt, response)
+    print(f"Prompt: {prompt}")
+    print(f"Response: {response}")
     print(f"Logits shape: {logits.shape}")
-    print(f"Vocabulary size: {logits.shape[-1]}")
-    print(f"Top 5 token logits: {logits[0][:5]}\n")
+    print(f"Number of response tokens: {logits.shape[0]}")
+    print(f"Vocabulary size: {logits.shape[1]}")
+    print(f"Top 5 token logits for first response token: {np.argsort(logits[0])[-5:][::-1]}\n")
     
-    # Example 5: Get probability distributions
+    # Example 5: Get probability distributions for response tokens
     print("=" * 60)
-    print("Example 5: Get probability distributions")
+    print("Example 5: Get probability distributions for response tokens")
     print("=" * 60)
     
-    probs = backend.get_probabilities("The answer is", max_new_tokens=1, temperature=1.0)
+    prompt = "The answer is"
+    response = " 42."
+    probs = backend.get_probabilities(prompt, response, temperature=1.0)
     print(f"Probabilities shape: {probs.shape}")
     print(f"Sum of probabilities: {probs.sum():.4f}")  # Should be ~1.0
     print(f"Top 5 probabilities: {probs[0][:5]}\n")

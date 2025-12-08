@@ -60,42 +60,44 @@ class BaseBackend(ABC):
     def get_logits(
         self,
         prompts: Union[str, List[str]],
-        max_new_tokens: int = 1,
+        responses: Union[str, List[str]],
         **kwargs
     ) -> Union[np.ndarray, List[np.ndarray]]:
-        """Get token logits for given prompts.
+        """Get token logits for predicting response tokens given prompts.
         
         Args:
             prompts: Single prompt or list of prompts
-            max_new_tokens: Number of tokens to generate logits for
+            responses: Single response or list of responses to get logits for
             **kwargs: Additional arguments
             
         Returns:
-            Logits array(s) with shape (batch_size, seq_len, vocab_size) or
-            list of arrays with shape (seq_len, vocab_size)
+            Logits array(s) with shape (batch_size, response_len, vocab_size) or
+            list of arrays with shape (response_len, vocab_size)
+            where response_len is the number of tokens in the response
         """
         pass
 
     def get_probabilities(
         self,
         prompts: Union[str, List[str]],
-        max_new_tokens: int = 1,
+        responses: Union[str, List[str]],
         temperature: float = 1.0,
         **kwargs
     ) -> Union[np.ndarray, List[np.ndarray]]:
-        """Get token probability distributions for given prompts.
+        """Get token probability distributions for predicting response tokens given prompts.
         
         Args:
             prompts: Single prompt or list of prompts
-            max_new_tokens: Number of tokens to generate probabilities for
+            responses: Single response or list of responses to get probabilities for
             temperature: Temperature for softmax normalization
             **kwargs: Additional arguments
             
         Returns:
-            Probability array(s) with shape (batch_size, seq_len, vocab_size) or
-            list of arrays with shape (seq_len, vocab_size)
+            Probability array(s) with shape (batch_size, response_len, vocab_size) or
+            list of arrays with shape (response_len, vocab_size)
+            where response_len is the number of tokens in the response
         """
-        logits = self.get_logits(prompts, max_new_tokens=max_new_tokens, **kwargs)
+        logits = self.get_logits(prompts, responses, **kwargs)
         
         # Apply temperature and softmax
         if isinstance(logits, list):

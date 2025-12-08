@@ -51,33 +51,15 @@ class DistributionExtractor:
         full_prompt = question + solution
         full_prompt_ids = self.backend.encode(full_prompt)
         
-        # Extract distributions token by token
-        distributions = []
-        current_prompt = question
-        
-        for i, solution_token_id in enumerate(solution_ids):
-            # Get logits for the next token position
-            logits = self.backend.get_logits(current_prompt, max_new_tokens=1)
-            
-            # logits shape: (1, vocab_size) - take the first (and only) token
-            next_token_logits = logits[0]  # (vocab_size,)
-            
-            if use_logits:
-                distributions.append(next_token_logits)
-            else:
-                # Convert to probabilities
-                probs = self.backend.get_probabilities(
-                    current_prompt, max_new_tokens=1, temperature=temperature
-                )
-                next_token_probs = probs[0]  # (vocab_size,)
-                distributions.append(next_token_probs)
-            
-            # Update prompt with the next token
-            solution_token = tokenizer.decode([solution_token_id], skip_special_tokens=True)
-            current_prompt = current_prompt + solution_token
-        
-        # Stack into array: (seq_len, vocab_size)
-        distribution_array = np.stack(distributions)
+        # Get logits/probabilities for all solution tokens at once
+        if use_logits:
+            # Get logits for all solution tokens
+            distribution_array = self.backend.get_logits(question, solution)
+        else:
+            # Get probabilities for all solution tokens
+            distribution_array = self.backend.get_probabilities(
+                question, solution, temperature=temperature
+            )
         
         if return_token_ids:
             return distribution_array, solution_ids

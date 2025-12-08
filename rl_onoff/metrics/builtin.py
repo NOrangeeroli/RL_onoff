@@ -67,20 +67,27 @@ class PerplexityMetric(BaseMetric):
                 perplexities.append(float('inf'))
                 continue
             
-            # Get logits for the sequence
-            logits = self.backend.get_logits(pred, max_new_tokens=len(token_ids))
+            # Get probabilities for all tokens in the prediction
+            # Use empty prompt and prediction as solution to get logits for each token
+            # Note: logits at position i predict token at position i+1 in the full sequence
+            # So for token at position i in the solution, we use logits at position i-1
+            probs = self.backend.get_probabilities("", pred, temperature=1.0)
             
-            # Compute log probabilities
-            probs = self.backend.get_probabilities(pred, max_new_tokens=len(token_ids))
-            
-            # Compute perplexity: exp(-1/N * sum(log P(token_i)))
+            # Compute perplexity: exp(-1/N * sum(log P(token_i | tokens_0...i-1)))
             log_probs = np.log(probs + 1e-10)  # Add small epsilon for numerical stability
             
-            # For each position, get the probability of the actual token
+            # For each token position, get the probability of the actual token
+            # Logits at position i predict token at position i+1
+            # So for token at position i (0-indexed), we use logits at position i-1
             token_log_probs = []
             for i, token_id in enumerate(token_ids):
-                if i < len(log_probs):
-                    token_log_probs.append(log_probs[i][token_id])
+                if i > 0 and i-1 < len(log_probs) and token_id < len(log_probs[i-1]):
+                    # Use logits from previous position to predict current token
+                    token_log_probs.append(log_probs[i-1][token_id])
+                elif i == 0:
+                    # For first token, we don't have previous context in the logits
+                    # Skip first token or use uniform prior (we'll skip for now)
+                    continue
             
             if len(token_log_probs) == 0:
                 perplexities.append(float('inf'))

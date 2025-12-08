@@ -108,10 +108,10 @@ class SGLangBackend(BaseBackend):
     def get_logits(
         self,
         prompts: Union[str, List[str]],
-        max_new_tokens: int = 1,
+        responses: Union[str, List[str]],
         **kwargs
     ) -> Union[np.ndarray, List[np.ndarray]]:
-        """Get token logits for given prompts."""
+        """Get token logits for predicting response tokens given prompts."""
         if not self._is_loaded:
             self.load()
 
@@ -201,7 +201,7 @@ if __name__ == "__main__":
         print("=" * 60)
         
         try:
-            logits = backend.get_logits("The answer is", max_new_tokens=1)
+            logits = backend.get_logits("The answer is", " 42.")
             print(f"Logits shape: {logits.shape}")
         except NotImplementedError as e:
             print(f"Note: {e}\n")
