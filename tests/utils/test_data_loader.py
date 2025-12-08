@@ -216,10 +216,10 @@ class TestDataLoader:
             assert len(data) >= 1
             
         except ImportError:
-            pytest.skip("HuggingFace datasets library not available")
+            pytest.fail("HuggingFace datasets library not available")
         except Exception as e:
             # If dataset doesn't exist or network issues, skip the test
-            pytest.skip(f"Could not load real dataset: {e}")
+            pytest.fail(f"Could not load real dataset: {e}")
     
     @pytest.mark.integration
     def test_load_huggingface_dataset_real_aime_with_limit(self):
@@ -244,9 +244,9 @@ class TestDataLoader:
             assert "solution" in data[0]
             
         except ImportError:
-            pytest.skip("HuggingFace datasets library not available")
+            pytest.fail("HuggingFace datasets library not available")
         except Exception as e:
-            pytest.skip(f"Could not load real dataset: {e}")
+            pytest.fail(f"Could not load real dataset: {e}")
     
     @pytest.mark.integration
     def test_load_real_parquet_files(self):
