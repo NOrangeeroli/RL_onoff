@@ -1,7 +1,7 @@
 Test Execution Report
 ====================
-Command: pytest tests/test_backends.py -v
-Date: Mon Dec  8 05:36:33 CET 2025
+Command: pytest tests/utils/test_data_loader.py -v
+Date: Mon Dec  8 06:39:29 CET 2025
 Working Directory: /lustre/fast/fast/txiao/ym/rl_onoff
 
 Output:
@@ -11,52 +11,211 @@ platform linux -- Python 3.10.19, pytest-9.0.2, pluggy-1.6.0 -- /fast/txiao/cond
 cachedir: .pytest_cache
 rootdir: /lustre/fast/fast/txiao/ym/rl_onoff
 plugins: anyio-4.4.0, typeguard-4.3.0, cov-7.0.0
-collecting ... collected 15 items
+collecting ... collected 18 items
 
-tests/test_backends.py::TestBackendsSamplingAndMetrics::test_backend_generate_single PASSED [  6%]
-tests/test_backends.py::TestBackendsSamplingAndMetrics::test_backend_generate_batch PASSED [ 13%]
-tests/test_backends.py::TestBackendsSamplingAndMetrics::test_backend_with_sampler PASSED [ 20%]
-tests/test_backends.py::TestBackendsSamplingAndMetrics::test_backend_with_metrics PASSED [ 26%]
-tests/test_backends.py::TestBackendsDistributionExtraction::test_backend_get_logits PASSED [ 33%]
-tests/test_backends.py::TestBackendsDistributionExtraction::test_backend_get_probabilities PASSED [ 40%]
-tests/test_backends.py::TestBackendsDistributionExtraction::test_backend_with_distribution_extractor PASSED [ 46%]
-tests/test_backends.py::TestBackendsDivergenceCalculation::test_backend_get_distributions_for_divergence PASSED [ 53%]
-tests/test_backends.py::TestBackendsDivergenceCalculation::test_backend_encode_decode PASSED [ 60%]
-tests/test_backends.py::TestBackendsModelSwitching::test_backend_with_model_switcher PASSED [ 66%]
-tests/test_backends.py::TestBackendsModelSwitching::test_backend_get_probabilities_for_switching PASSED [ 73%]
-tests/test_backends.py::TestBackendsBase::test_base_backend_is_loaded PASSED [ 80%]
-tests/test_backends.py::TestBackendsBase::test_base_backend_repr PASSED  [ 86%]
-tests/test_backends.py::TestBackendsBase::test_get_backend_function FAILED [ 93%]
-tests/test_backends.py::TestBackendsIntegration::test_all_purposes_integration PASSED [100%]
+tests/utils/test_data_loader.py::TestDataLoader::test_load_json PASSED   [  5%]
+tests/utils/test_data_loader.py::TestDataLoader::test_load_jsonl PASSED  [ 11%]
+tests/utils/test_data_loader.py::TestDataLoader::test_load_csv PASSED    [ 16%]
+tests/utils/test_data_loader.py::TestDataLoader::test_load_csv_preserves_columns FAILED [ 22%]
+tests/utils/test_data_loader.py::TestDataLoader::test_load_data_auto_detect_json PASSED [ 27%]
+tests/utils/test_data_loader.py::TestDataLoader::test_load_data_auto_detect_jsonl PASSED [ 33%]
+tests/utils/test_data_loader.py::TestDataLoader::test_load_data_auto_detect_csv PASSED [ 38%]
+tests/utils/test_data_loader.py::TestDataLoader::test_load_parquet PASSED [ 44%]
+tests/utils/test_data_loader.py::TestDataLoader::test_load_parquet_preserves_columns PASSED [ 50%]
+tests/utils/test_data_loader.py::TestDataLoader::test_load_data_auto_detect_parquet PASSED [ 55%]
+tests/utils/test_data_loader.py::TestDataLoader::test_load_data_file_not_found PASSED [ 61%]
+tests/utils/test_data_loader.py::TestDataLoader::test_load_data_unsupported_format PASSED [ 66%]
+tests/utils/test_data_loader.py::TestDataLoader::test_load_huggingface_dataset_real_aime_2024 SKIPPED [ 72%]
+tests/utils/test_data_loader.py::TestDataLoader::test_load_huggingface_dataset_real_aime_with_limit PASSED [ 77%]
+tests/utils/test_data_loader.py::TestDataLoader::test_load_real_parquet_files FAILED [ 83%]
+tests/utils/test_data_loader.py::TestDataLoader::test_load_real_parquet_gsm8k PASSED [ 88%]
+tests/utils/test_data_loader.py::TestDataLoader::test_load_real_parquet_math PASSED [ 94%]
+tests/utils/test_data_loader.py::TestDataLoader::test_load_real_parquet_preserves_all_columns SKIPPED [100%]
 
 =================================== FAILURES ===================================
-__________________ TestBackendsBase.test_get_backend_function __________________
+________________ TestDataLoader.test_load_csv_preserves_columns ________________
 
-self = <tests.test_backends.TestBackendsBase object at 0x1535e61e1c00>
+self = <tests.utils.test_data_loader.TestDataLoader object at 0x1510d2a4c250>
+sample_csv_file = '/home/txiao/tmpdir/tmpdiovhj89.csv'
 
-    def test_get_backend_function(self):
-        """Test get_backend factory function."""
-        with patch('rl_onoff.backends.huggingface.HuggingFaceBackend') as mock_hf:
-            backend = get_backend("huggingface", model_name="test")
->           mock_hf.assert_called_once()
+    def test_load_csv_preserves_columns(self, sample_csv_file):
+        """Test loading CSV preserves all columns."""
+        data = DataLoader.load_csv(sample_csv_file)
+        assert len(data) == 2
+        # Original column names are preserved
+        assert "question" in data[0]
+        assert "solution" in data[0]
+        assert data[0]["question"] == "What is 2+2?"
+>       assert data[0]["solution"] == "4"
+E       AssertionError: assert 4 == '4'
 
-tests/test_backends.py:232: 
+tests/utils/test_data_loader.py:122: AssertionError
+_________________ TestDataLoader.test_load_real_parquet_files __________________
+
+self = <tests.utils.test_data_loader.TestDataLoader object at 0x1510d2a40460>
+
+    @pytest.mark.integration
+    def test_load_real_parquet_files(self):
+        """Test loading real parquet files from data directory."""
+        import pandas as pd
+        from pathlib import Path
+    
+        # Test files in data directory
+        test_files = [
+            "data/gsm8k_level1/train.parquet",
+            "data/gsm8k_level1/test.parquet",
+            "data/math/train.parquet",
+            "data/math/test.parquet",
+            "data/amc23/test.parquet",
+            "data/aime2025/test.parquet",
+        ]
+    
+        for file_path in test_files:
+            file_path_obj = Path(file_path)
+            if not file_path_obj.exists():
+                pytest.skip(f"Data file not found: {file_path}")
+    
+            try:
+                # First, check what columns exist
+>               df_sample = pd.read_parquet(str(file_path_obj), nrows=1)
+
+tests/utils/test_data_loader.py:273: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/fast/txiao/conda_envs/rlon/lib/python3.10/site-packages/pandas/io/parquet.py:669: in read_parquet
+    return impl.read(
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <MagicMock name='HuggingFaceBackend' id='23321238183824'>
+self = <pandas.io.parquet.PyArrowImpl object at 0x1510d27d6740>
+path = 'data/gsm8k_level1/train.parquet', columns = None, filters = None
+use_nullable_dtypes = False, dtype_backend = <no_default>
+storage_options = None, filesystem = None
+kwargs = {'nrows': 1, 'use_pandas_metadata': True}, to_pandas_kwargs = {}
+manager = 'block'
+path_or_handle = <_io.BufferedReader name='data/gsm8k_level1/train.parquet'>
+handles = IOHandles(handle=<_io.BufferedReader name='data/gsm8k_level1/train.parquet'>, compression={'method': None}, created_handles=[], is_wrapped=False)
 
-    def assert_called_once(self):
-        """assert that the mock was called only once.
-        """
-        if not self.call_count == 1:
-            msg = ("Expected '%s' to have been called once. Called %s times.%s"
-                   % (self._mock_name or 'mock',
-                      self.call_count,
-                      self._calls_repr()))
->           raise AssertionError(msg)
-E           AssertionError: Expected 'HuggingFaceBackend' to have been called once. Called 0 times.
+    def read(
+        self,
+        path,
+        columns=None,
+        filters=None,
+        use_nullable_dtypes: bool = False,
+        dtype_backend: DtypeBackend | lib.NoDefault = lib.no_default,
+        storage_options: StorageOptions | None = None,
+        filesystem=None,
+        **kwargs,
+    ) -> DataFrame:
+        kwargs["use_pandas_metadata"] = True
+    
+        to_pandas_kwargs = {}
+    
+        manager = _get_option("mode.data_manager", silent=True)
+        if manager == "array":
+            to_pandas_kwargs["split_blocks"] = True
+        path_or_handle, handles, filesystem = _get_path_or_handle(
+            path,
+            filesystem,
+            storage_options=storage_options,
+            mode="rb",
+        )
+        try:
+>           pa_table = self.api.parquet.read_table(
+                path_or_handle,
+                columns=columns,
+                filesystem=filesystem,
+                filters=filters,
+                **kwargs,
+            )
+E           TypeError: read_table() got an unexpected keyword argument 'nrows'
 
-/fast/txiao/conda_envs/rlon/lib/python3.10/unittest/mock.py:908: AssertionError
+/fast/txiao/conda_envs/rlon/lib/python3.10/site-packages/pandas/io/parquet.py:265: TypeError
+
+During handling of the above exception, another exception occurred:
+
+self = <tests.utils.test_data_loader.TestDataLoader object at 0x1510d2a40460>
+
+    @pytest.mark.integration
+    def test_load_real_parquet_files(self):
+        """Test loading real parquet files from data directory."""
+        import pandas as pd
+        from pathlib import Path
+    
+        # Test files in data directory
+        test_files = [
+            "data/gsm8k_level1/train.parquet",
+            "data/gsm8k_level1/test.parquet",
+            "data/math/train.parquet",
+            "data/math/test.parquet",
+            "data/amc23/test.parquet",
+            "data/aime2025/test.parquet",
+        ]
+    
+        for file_path in test_files:
+            file_path_obj = Path(file_path)
+            if not file_path_obj.exists():
+                pytest.skip(f"Data file not found: {file_path}")
+    
+            try:
+                # First, check what columns exist
+                df_sample = pd.read_parquet(str(file_path_obj), nrows=1)
+                original_columns = list(df_sample.columns)
+                print(f"\n{file_path} columns: {original_columns}")
+    
+                # Load using DataLoader
+                data = load_data(file_path)
+    
+                # Verify we got data
+                assert isinstance(data, list)
+                assert len(data) > 0
+    
+                # Verify structure - original column names are preserved
+                # Check that all original columns are present
+                loaded_columns = list(data[0].keys())
+                for col in original_columns:
+                    assert col in data[0], f"Column '{col}' missing in loaded data"
+    
+                # Verify data types (check first few columns)
+                for col in original_columns[:3]:  # Check first 3 columns
+                    assert col in data[0]
+                    # Most columns should be strings, numbers, or None
+                    assert isinstance(data[0][col], (str, int, float, type(None), bool, list, dict))
+    
+                # Print success message
+                print(f"  ✓ Loaded {len(data)} items successfully")
+                print(f"  ✓ All {len(original_columns)} columns preserved: {original_columns}")
+    
+            except Exception as e:
+>               pytest.fail(f"Failed to load {file_path}: {e}")
+E               Failed: Failed to load data/gsm8k_level1/train.parquet: read_table() got an unexpected keyword argument 'nrows'
+
+tests/utils/test_data_loader.py:301: Failed
+=============================== warnings summary ===============================
+tests/utils/test_data_loader.py:187
+  /lustre/fast/fast/txiao/ym/rl_onoff/tests/utils/test_data_loader.py:187: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests/utils/test_data_loader.py:223
+  /lustre/fast/fast/txiao/ym/rl_onoff/tests/utils/test_data_loader.py:223: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests/utils/test_data_loader.py:250
+  /lustre/fast/fast/txiao/ym/rl_onoff/tests/utils/test_data_loader.py:250: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests/utils/test_data_loader.py:303
+  /lustre/fast/fast/txiao/ym/rl_onoff/tests/utils/test_data_loader.py:303: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests/utils/test_data_loader.py:337
+  /lustre/fast/fast/txiao/ym/rl_onoff/tests/utils/test_data_loader.py:337: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests/utils/test_data_loader.py:363
+  /lustre/fast/fast/txiao/ym/rl_onoff/tests/utils/test_data_loader.py:363: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
 =========================== short test summary info ============================
-FAILED tests/test_backends.py::TestBackendsBase::test_get_backend_function - ...
-======================== 1 failed, 14 passed in 19.42s =========================
+FAILED tests/utils/test_data_loader.py::TestDataLoader::test_load_csv_preserves_columns
+FAILED tests/utils/test_data_loader.py::TestDataLoader::test_load_real_parquet_files
+============= 2 failed, 14 passed, 2 skipped, 6 warnings in 30.89s =============
