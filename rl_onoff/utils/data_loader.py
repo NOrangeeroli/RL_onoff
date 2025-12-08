@@ -227,3 +227,155 @@ def load_data(
     """
     return DataLoader.load_data(file_path=file_path, **kwargs)
 
+
+if __name__ == "__main__":
+    """Simple use cases for DataLoader."""
+    
+    import tempfile
+    import os
+    
+    print("=" * 60)
+    print("DataLoader Use Cases")
+    print("=" * 60)
+    
+    # Example 1: Load JSON file
+    print("\nExample 1: Load JSON file")
+    print("-" * 60)
+    
+    # Create a temporary JSON file
+    json_data = [
+        {"question": "What is 2+2?", "solution": "4"},
+        {"question": "What is 3+3?", "solution": "6"}
+    ]
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        json.dump(json_data, f)
+        json_file = f.name
+    
+    try:
+        data = DataLoader.load_json(json_file)
+        print(f"Loaded {len(data)} items from JSON")
+        print(f"First item: {data[0]}")
+    finally:
+        os.unlink(json_file)
+    
+    # Example 2: Load JSONL file
+    print("\nExample 2: Load JSONL file")
+    print("-" * 60)
+    
+    # Create a temporary JSONL file
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
+        for item in json_data:
+            f.write(json.dumps(item) + '\n')
+        jsonl_file = f.name
+    
+    try:
+        data = DataLoader.load_jsonl(jsonl_file)
+        print(f"Loaded {len(data)} items from JSONL")
+        print(f"First item: {data[0]}")
+    finally:
+        os.unlink(jsonl_file)
+    
+    # Example 3: Load CSV file
+    print("\nExample 3: Load CSV file")
+    print("-" * 60)
+    
+    # Create a temporary CSV file
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=["question", "solution"])
+        writer.writeheader()
+        writer.writerows(json_data)
+        csv_file = f.name
+    
+    try:
+        data = DataLoader.load_csv(csv_file)
+        print(f"Loaded {len(data)} items from CSV")
+        print(f"First item: {data[0]}")
+        print(f"Column names preserved: {list(data[0].keys())}")
+    finally:
+        os.unlink(csv_file)
+    
+    # Example 4: Load Parquet file (if pandas is available)
+    print("\nExample 4: Load Parquet file")
+    print("-" * 60)
+    
+    try:
+        # Create a temporary Parquet file
+        df = pd.DataFrame(json_data)
+        with tempfile.NamedTemporaryFile(suffix='.parquet', delete=False) as f:
+            parquet_file = f.name
+        
+        df.to_parquet(parquet_file, index=False)
+        
+        try:
+            data = DataLoader.load_parquet(parquet_file)
+            print(f"Loaded {len(data)} items from Parquet")
+            print(f"First item: {data[0]}")
+            print(f"Column names preserved: {list(data[0].keys())}")
+        finally:
+            os.unlink(parquet_file)
+    except Exception as e:
+        print(f"Parquet example skipped: {e}")
+    
+    # Example 5: Auto-detect file format
+    print("\nExample 5: Auto-detect file format")
+    print("-" * 60)
+    
+    # Create a temporary JSON file
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        json.dump(json_data, f)
+        auto_file = f.name
+    
+    try:
+        # Use convenience function with auto-detection
+        data = load_data(auto_file)
+        print(f"Auto-detected format and loaded {len(data)} items")
+        print(f"First item: {data[0]}")
+    finally:
+        os.unlink(auto_file)
+    
+    # Example 6: Load HuggingFace dataset (if available)
+    print("\nExample 6: Load HuggingFace dataset")
+    print("-" * 60)
+    
+    if DATASETS_AVAILABLE:
+        try:
+            # Load a small dataset for demonstration
+            data = DataLoader.load_huggingface_dataset(
+                dataset_name="HuggingFaceH4/aime_2024",
+                split="train[:5]"  # Only first 5 examples
+            )
+            print(f"Loaded {len(data)} items from HuggingFace dataset")
+            if len(data) > 0:
+                print(f"First item keys: {list(data[0].keys())}")
+                print(f"Sample keys: {list(data[0].keys())[:3]}")
+        except Exception as e:
+            print(f"HuggingFace dataset example skipped: {e}")
+    else:
+        print("HuggingFace datasets not available. Install with: pip install datasets")
+    
+    # Example 7: Handle different data structures
+    print("\nExample 7: Handle different JSON structures")
+    print("-" * 60)
+    
+    # JSON with nested structure
+    nested_json = {
+        "data": [
+            {"question": "What is 2+2?", "solution": "4"},
+            {"question": "What is 3+3?", "solution": "6"}
+        ]
+    }
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        json.dump(nested_json, f)
+        nested_file = f.name
+    
+    try:
+        data = load_data(nested_file)
+        print(f"Loaded {len(data)} items from nested JSON structure")
+        print(f"Auto-extracted from 'data' key")
+    finally:
+        os.unlink(nested_file)
+    
+    print("\n" + "=" * 60)
+    print("All examples completed!")
+    print("=" * 60)
