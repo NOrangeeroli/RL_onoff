@@ -7,11 +7,43 @@ import pandas as pd
 from pathlib import Path
 
 try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+    np = None
+
+try:
     from datasets import load_dataset
     DATASETS_AVAILABLE = True
 except ImportError:
     DATASETS_AVAILABLE = False
     load_dataset = None
+
+
+def _convert_numpy_to_python(obj: Any) -> Any:
+    """Recursively convert numpy arrays and scalars to Python native types.
+    
+    Args:
+        obj: Object that may contain numpy arrays
+        
+    Returns:
+        Object with numpy arrays converted to Python lists
+    """
+    if NUMPY_AVAILABLE and np is not None:
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, (np.integer, np.floating)):
+            return obj.item()
+        elif isinstance(obj, np.bool_):
+            return bool(obj)
+    
+    if isinstance(obj, dict):
+        return {key: _convert_numpy_to_python(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [_convert_numpy_to_python(item) for item in obj]
+    
+    return obj
 
 
 class DataLoader:
@@ -71,6 +103,9 @@ class DataLoader:
         # Convert DataFrame to list of dictionaries, preserving all columns as-is
         data = df.to_dict('records')
         
+        # Convert numpy arrays to Python native types
+        data = [_convert_numpy_to_python(item) for item in data]
+        
         return data
 
     @staticmethod
@@ -91,6 +126,9 @@ class DataLoader:
         
         # Convert DataFrame to list of dictionaries, preserving all columns as-is
         data = df.to_dict('records')
+        
+        # Convert numpy arrays to Python native types
+        data = [_convert_numpy_to_python(item) for item in data]
         
         return data
 
