@@ -1,7 +1,7 @@
 Test Execution Report
 ====================
 Command: pytest tests/utils/test_data_loader.py -v
-Date: Mon Dec  8 06:43:16 CET 2025
+Date: Mon Dec  8 07:02:44 CET 2025
 Working Directory: /lustre/fast/fast/txiao/ym/rl_onoff
 
 Output:
@@ -27,133 +27,9 @@ tests/utils/test_data_loader.py::TestDataLoader::test_load_data_file_not_found P
 tests/utils/test_data_loader.py::TestDataLoader::test_load_data_unsupported_format PASSED [ 66%]
 tests/utils/test_data_loader.py::TestDataLoader::test_load_huggingface_dataset_real_aime_2024 SKIPPED [ 72%]
 tests/utils/test_data_loader.py::TestDataLoader::test_load_huggingface_dataset_real_aime_with_limit PASSED [ 77%]
-tests/utils/test_data_loader.py::TestDataLoader::test_load_real_parquet_files FAILED [ 83%]
+tests/utils/test_data_loader.py::TestDataLoader::test_load_real_parquet_files PASSED [ 83%]
 tests/utils/test_data_loader.py::TestDataLoader::test_load_real_parquet_gsm8k PASSED [ 88%]
 tests/utils/test_data_loader.py::TestDataLoader::test_load_real_parquet_math PASSED [ 94%]
-tests/utils/test_data_loader.py::TestDataLoader::test_load_real_parquet_preserves_all_columns SKIPPED [100%]
+tests/utils/test_data_loader.py::TestDataLoader::test_load_real_parquet_preserves_all_columns PASSED [100%]
 
-=================================== FAILURES ===================================
-_________________ TestDataLoader.test_load_real_parquet_files __________________
-
-self = <tests.utils.test_data_loader.TestDataLoader object at 0x150ce1728370>
-
-    @pytest.mark.integration
-    def test_load_real_parquet_files(self):
-        """Test loading real parquet files from data directory."""
-        import pandas as pd
-        from pathlib import Path
-    
-        # Test files in data directory
-        test_files = [
-            "data/gsm8k_level1/train.parquet",
-            "data/gsm8k_level1/test.parquet",
-            "data/math/train.parquet",
-            "data/math/test.parquet",
-            "data/amc23/test.parquet",
-            "data/aime2025/test.parquet",
-        ]
-    
-        for file_path in test_files:
-            file_path_obj = Path(file_path)
-            if not file_path_obj.exists():
-                pytest.skip(f"Data file not found: {file_path}")
-    
-            try:
-                # First, check what columns exist
-                # Read full file and take first row (pd.read_parquet doesn't support nrows)
-                df_full = pd.read_parquet(str(file_path_obj))
-                df_sample = df_full.head(1)
-                original_columns = list(df_sample.columns)
-                print(f"\n{file_path} columns: {original_columns}")
-    
-                # Load using DataLoader
-                data = load_data(file_path)
-    
-                # Verify we got data
-                assert isinstance(data, list)
-                assert len(data) > 0
-    
-                # Verify structure - original column names are preserved
-                # Check that all original columns are present
-                loaded_columns = list(data[0].keys())
-                for col in original_columns:
-                    assert col in data[0], f"Column '{col}' missing in loaded data"
-    
-                # Verify data types (check first few columns)
-                for col in original_columns[:3]:  # Check first 3 columns
-                    assert col in data[0]
-                    # Most columns should be strings, numbers, or None
->                   assert isinstance(data[0][col], (str, int, float, type(None), bool, list, dict))
-E                   AssertionError: assert False
-E                    +  where False = isinstance(array([{'content': 'Mrs. Gable’s third grade class is on a field trip to the beach. For lunch, Mrs. Gable brought 20 lunches for the 20 students in her class. She included a pack of animal crackers in each lunch bag for dessert. Each pack of animal crackers contained 10 animal crackers. If 2 students did not eat their animal crackers, how many animal crackers were eaten in total among Mrs. Gable’s students?', 'role': 'user'}],\n      dtype=object), (<class 'str'>, <class 'int'>, <class 'float'>, <class 'NoneType'>, <class 'bool'>, <class 'list'>, ...))
-
-tests/utils/test_data_loader.py:297: AssertionError
-
-During handling of the above exception, another exception occurred:
-
-self = <tests.utils.test_data_loader.TestDataLoader object at 0x150ce1728370>
-
-    @pytest.mark.integration
-    def test_load_real_parquet_files(self):
-        """Test loading real parquet files from data directory."""
-        import pandas as pd
-        from pathlib import Path
-    
-        # Test files in data directory
-        test_files = [
-            "data/gsm8k_level1/train.parquet",
-            "data/gsm8k_level1/test.parquet",
-            "data/math/train.parquet",
-            "data/math/test.parquet",
-            "data/amc23/test.parquet",
-            "data/aime2025/test.parquet",
-        ]
-    
-        for file_path in test_files:
-            file_path_obj = Path(file_path)
-            if not file_path_obj.exists():
-                pytest.skip(f"Data file not found: {file_path}")
-    
-            try:
-                # First, check what columns exist
-                # Read full file and take first row (pd.read_parquet doesn't support nrows)
-                df_full = pd.read_parquet(str(file_path_obj))
-                df_sample = df_full.head(1)
-                original_columns = list(df_sample.columns)
-                print(f"\n{file_path} columns: {original_columns}")
-    
-                # Load using DataLoader
-                data = load_data(file_path)
-    
-                # Verify we got data
-                assert isinstance(data, list)
-                assert len(data) > 0
-    
-                # Verify structure - original column names are preserved
-                # Check that all original columns are present
-                loaded_columns = list(data[0].keys())
-                for col in original_columns:
-                    assert col in data[0], f"Column '{col}' missing in loaded data"
-    
-                # Verify data types (check first few columns)
-                for col in original_columns[:3]:  # Check first 3 columns
-                    assert col in data[0]
-                    # Most columns should be strings, numbers, or None
-                    assert isinstance(data[0][col], (str, int, float, type(None), bool, list, dict))
-    
-                # Print success message
-                print(f"  ✓ Loaded {len(data)} items successfully")
-                print(f"  ✓ All {len(original_columns)} columns preserved: {original_columns}")
-    
-            except Exception as e:
->               pytest.fail(f"Failed to load {file_path}: {e}")
-E               Failed: Failed to load data/gsm8k_level1/train.parquet: assert False
-E                +  where False = isinstance(array([{'content': 'Mrs. Gable’s third grade class is on a field trip to the beach. For lunch, Mrs. Gable brought 20 lunches for the 20 students in her class. She included a pack of animal crackers in each lunch bag for dessert. Each pack of animal crackers contained 10 animal crackers. If 2 students did not eat their animal crackers, how many animal crackers were eaten in total among Mrs. Gable’s students?', 'role': 'user'}],\n      dtype=object), (<class 'str'>, <class 'int'>, <class 'float'>, <class 'NoneType'>, <class 'bool'>, <class 'list'>, ...))
-
-tests/utils/test_data_loader.py:304: Failed
------------------------------ Captured stdout call -----------------------------
-
-data/gsm8k_level1/train.parquet columns: ['target', 'data_source', 'prompt', 'ability', 'reward_model', 'extra_info']
-=========================== short test summary info ============================
-FAILED tests/utils/test_data_loader.py::TestDataLoader::test_load_real_parquet_files
-=================== 1 failed, 15 passed, 2 skipped in 22.84s ===================
+======================== 17 passed, 1 skipped in 22.86s ========================
