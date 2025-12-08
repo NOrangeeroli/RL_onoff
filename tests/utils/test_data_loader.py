@@ -382,7 +382,8 @@ class TestDataLoader:
             try:
                 # First, check what columns exist by reading directly
                 import pandas as pd
-                df = pd.read_parquet(file_path, nrows=1)
+                df_full = pd.read_parquet(file_path)
+                df = df_full.head(1)
                 original_columns = df.columns.tolist()
                 
                 # Load using DataLoader
