@@ -109,7 +109,10 @@ class BaseTask:
         Returns:
             Reward score(s)
         """
-        answers = [self.extract_answer(prediction) for prediction in predictions]
+        # Extract answers from responses
+        extracted = [self.extract_answer(prediction) for prediction in predictions]
+        # Extract the "answer" field from each extracted dict (handle None values)
+        answers = [ext.get("answer") or "" for ext in extracted]
         return self.reward.compute(answers, references, **kwargs)
 
     def __repr__(self) -> str:
