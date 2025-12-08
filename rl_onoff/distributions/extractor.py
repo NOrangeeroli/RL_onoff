@@ -170,3 +170,141 @@ class DistributionExtractor:
         else:
             return None
 
+
+if __name__ == "__main__":
+    """Simple use cases for DistributionExtractor."""
+    
+    try:
+        from rl_onoff.backends import HuggingFaceBackend
+        
+        print("Running DistributionExtractor examples...")
+        print("=" * 60)
+        
+        # Initialize backend (using a small model for demonstration)
+        model_name = "gpt2"  # Replace with your preferred model
+        backend = HuggingFaceBackend(model_name=model_name)
+        
+        # Create distribution extractor
+        extractor = DistributionExtractor(backend)
+        print(f"DistributionExtractor initialized with backend: {model_name}\n")
+        
+        # Example 1: Extract probabilities for a single question-solution pair
+        print("=" * 60)
+        print("Example 1: Extract probabilities for a single question-solution pair")
+        print("=" * 60)
+        question = "What is 2 + 2?"
+        solution = " The answer is 4."
+        probs = extractor.extract_distributions(
+            question=question,
+            solution=solution,
+            use_logits=False,
+            temperature=1.0
+        )
+        print(f"Question: {question}")
+        print(f"Solution: {solution}")
+        print(f"Probabilities shape: {probs.shape}")
+        print(f"Number of tokens in solution: {probs.shape[0]}")
+        print(f"Vocabulary size: {probs.shape[1]}")
+        print(f"First token probabilities (top 5): {np.argsort(probs[0])[-5:][::-1]}\n")
+        
+        # Example 2: Extract logits instead of probabilities
+        print("=" * 60)
+        print("Example 2: Extract logits instead of probabilities")
+        print("=" * 60)
+        logits = extractor.extract_distributions(
+            question=question,
+            solution=solution,
+            use_logits=True
+        )
+        print(f"Logits shape: {logits.shape}")
+        print(f"First token logits (top 5): {np.argsort(logits[0])[-5:][::-1]}\n")
+        
+        # Example 3: Extract with token IDs
+        print("=" * 60)
+        print("Example 3: Extract distributions with token IDs")
+        print("=" * 60)
+        probs_with_ids, token_ids = extractor.extract_distributions(
+            question=question,
+            solution=solution,
+            return_token_ids=True
+        )
+        print(f"Probabilities shape: {probs_with_ids.shape}")
+        print(f"Token IDs: {token_ids}")
+        print(f"Number of tokens: {len(token_ids)}\n")
+        
+        # Example 4: Batch extraction
+        print("=" * 60)
+        print("Example 4: Batch extraction for multiple question-solution pairs")
+        print("=" * 60)
+        questions = [
+            "What is 2 + 2?",
+            "What is the capital of France?"
+        ]
+        solutions = [
+            " The answer is 4.",
+            " The capital is Paris."
+        ]
+        batch_results = extractor.extract_distributions_batch(
+            questions=questions,
+            solutions=solutions,
+            use_logits=False
+        )
+        print(f"Number of results: {len(batch_results)}")
+        for i, (q, s, result) in enumerate(zip(questions, solutions, batch_results)):
+            print(f"  Pair {i+1}:")
+            print(f"    Question: {q}")
+            print(f"    Solution: {s}")
+            print(f"    Distribution shape: {result.shape}\n")
+        
+        # Example 5: Get vocabulary size
+        print("=" * 60)
+        print("Example 5: Get vocabulary size")
+        print("=" * 60)
+        vocab_size = extractor.get_vocab_size()
+        print(f"Vocabulary size: {vocab_size}\n")
+        
+        # Example 6: Token ID conversions
+        print("=" * 60)
+        print("Example 6: Token ID conversions")
+        print("=" * 60)
+        test_token = "hello"
+        token_id = extractor.get_token_to_id(test_token)
+        if token_id is not None:
+            print(f"Token '{test_token}' -> ID: {token_id}")
+            converted_back = extractor.get_id_to_token(token_id)
+            print(f"ID {token_id} -> Token: '{converted_back}'\n")
+        else:
+            print(f"Could not convert token '{test_token}' to ID\n")
+        
+        # Example 7: Extract with different temperature
+        print("=" * 60)
+        print("Example 7: Extract with different temperature")
+        print("=" * 60)
+        probs_temp_high = extractor.extract_distributions(
+            question=question,
+            solution=solution,
+            temperature=2.0  # Higher temperature = more uniform distribution
+        )
+        probs_temp_low = extractor.extract_distributions(
+            question=question,
+            solution=solution,
+            temperature=0.5  # Lower temperature = sharper distribution
+        )
+        print(f"High temperature (2.0) - entropy: {np.sum(-probs_temp_high[0] * np.log(probs_temp_high[0] + 1e-10)):.4f}")
+        print(f"Low temperature (0.5) - entropy: {np.sum(-probs_temp_low[0] * np.log(probs_temp_low[0] + 1e-10)):.4f}\n")
+        
+        print("=" * 60)
+        print("All examples completed successfully!")
+        print("=" * 60)
+        
+    except ImportError as e:
+        print(f"Import error: {e}")
+        print("Please ensure HuggingFace backend is available.")
+    except NotImplementedError as e:
+        print(f"\nNote: {e}")
+        print("This backend does not support logit extraction.")
+        print("Please use HuggingFace backend for distribution extraction.")
+    except Exception as e:
+        print(f"\nAn error occurred during DistributionExtractor examples: {e}")
+        print("Please ensure you have a compatible model and sufficient resources.")
+

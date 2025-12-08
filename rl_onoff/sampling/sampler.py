@@ -31,56 +31,8 @@ class Sampler:
         if not backend.is_loaded():
             backend.load()
 
+
     def sample(
-        self,
-        prompts: Union[str, List[str]],
-        config: Optional[SamplingConfig] = None,
-        **kwargs
-    ) -> Union[str, List[str], List[List[str]]]:
-        """Sample text from the model.
-        
-        Args:
-            prompts: Single prompt or list of prompts
-            config: Sampling configuration
-            **kwargs: Additional generation arguments
-            
-        Returns:
-            If num_samples=1: single text or list of texts
-            If num_samples>1: list of texts or list of lists of texts
-        """
-        if config is None:
-            config = SamplingConfig()
-
-        is_single = isinstance(prompts, str)
-        if is_single:
-            prompts = [prompts]
-
-        all_samples = []
-        
-        for prompt in prompts:
-            prompt_samples = []
-            for _ in range(config.num_samples):
-                text = self.backend.generate(
-                    prompt,
-                    max_new_tokens=config.max_new_tokens,
-                    temperature=config.temperature,
-                    top_k=config.top_k,
-                    top_p=config.top_p,
-                    do_sample=config.do_sample,
-                    **kwargs
-                )
-                prompt_samples.append(text)
-            
-            if config.num_samples == 1:
-                all_samples.append(prompt_samples[0])
-            else:
-                all_samples.append(prompt_samples)
-
-        if is_single:
-            return all_samples[0]
-        return all_samples
-
-    def sample_batch(
         self,
         prompts: List[str],
         config: Optional[SamplingConfig] = None,
@@ -101,17 +53,59 @@ class Sampler:
         if config is None:
             config = SamplingConfig()
 
-        if batch_size is None:
-            # Process all at once
-            return self.sample(prompts, config=config, **kwargs)
+        # Prepare generation kwargs
+        gen_kwargs = {
+            "max_new_tokens": config.max_new_tokens,
+            "temperature": config.temperature,
+            "top_k": config.top_k,
+            "top_p": config.top_p,
+            "do_sample": config.do_sample,
+            **kwargs
+        }
 
-        results = []
-        for i in range(0, len(prompts), batch_size):
-            batch = prompts[i:i + batch_size]
-            batch_results = self.sample(batch, config=config, **kwargs)
-            results.extend(batch_results)
+        all_results = []
+
+        if batch_size is None:
+            # Process all prompts at once in a single batch
+            if config.num_samples == 1:
+                # Single sample per prompt: batch all prompts together
+                results = self.backend.generate(prompts, **gen_kwargs)
+                all_results = results
+            else:
+                # Multiple samples per prompt: batch all prompts for each sample iteration
+                for sample_idx in range(config.num_samples):
+                    batch_results = self.backend.generate(prompts, **gen_kwargs)
+                    if sample_idx == 0:
+                        # Initialize with lists for each prompt
+                        all_results = [[result] for result in batch_results]
+                    else:
+                        # Append to existing lists
+                        for i, result in enumerate(batch_results):
+                            all_results[i].append(result)
+        else:
+            # Process in batches
+            if config.num_samples == 1:
+                # Single sample per prompt: process in batches
+                for i in range(0, len(prompts), batch_size):
+                    batch_prompts = prompts[i:i + batch_size]
+                    batch_results = self.backend.generate(batch_prompts, **gen_kwargs)
+                    all_results.extend(batch_results)
+            else:
+                # Multiple samples per prompt: for each sample iteration, process in batches
+                for sample_idx in range(config.num_samples):
+                    for i in range(0, len(prompts), batch_size):
+                        batch_prompts = prompts[i:i + batch_size]
+                        batch_results = self.backend.generate(batch_prompts, **gen_kwargs)
+                        if sample_idx == 0:
+                            # Initialize for first sample
+                            all_results.extend([[result] for result in batch_results])
+                        else:
+                            # Append to existing lists
+                            start_idx = i
+                            for j, result in enumerate(batch_results):
+                                all_results[start_idx + j].append(result)
         
-        return results
+        return all_results
 
 
 if __name__ == "__main__":
@@ -180,28 +174,9 @@ if __name__ == "__main__":
             print(f"  Sample {i}: {sample}")
         print()
         
-        # Example 5: Batch sampling
+        # Example 5: Deterministic sampling (greedy decoding)
         print("=" * 60)
-        print("Example 5: Batch sampling with batch_size")
-        print("=" * 60)
-        prompts = [
-            "The capital of France is",
-            "The capital of Japan is",
-            "The capital of Brazil is",
-            "The capital of Australia is"
-        ]
-        results = sampler.sample_batch(
-            prompts,
-            config=SamplingConfig(max_new_tokens=10),
-            batch_size=2  # Process 2 prompts at a time
-        )
-        for prompt, result in zip(prompts, results):
-            print(f"Prompt: {prompt}")
-            print(f"Generated: {result}\n")
-        
-        # Example 6: Deterministic sampling (greedy decoding)
-        print("=" * 60)
-        print("Example 6: Deterministic sampling (do_sample=False)")
+        print("Example 5: Deterministic sampling (do_sample=False)")
         print("=" * 60)
         config = SamplingConfig(max_new_tokens=15, do_sample=False)
         result = sampler.sample("The answer to life, the universe, and everything is", config=config)
