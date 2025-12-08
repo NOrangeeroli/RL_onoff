@@ -130,7 +130,7 @@ class VLLMBackend(BaseBackend):
             self.load()
         
         # vLLM models have a tokenizer attribute
-        return self.model.llm_engine.tokenizer.tokenizer if hasattr(
-            self.model, "llm_engine"
-        ) else None
+        if hasattr(self.model, "llm_engine") and self.model.llm_engine is not None:
+            return self.model.llm_engine.tokenizer.tokenizer
+        return None
 

@@ -24,8 +24,9 @@ class TestSGLangBackend:
             mem_fraction_static=0.85
         )
         assert backend.model_name == "test_model"
-        assert backend.runtime is None
-        assert backend.tokenizer is None
+        # runtime and tokenizer are not set until load() is called
+        assert not hasattr(backend, 'runtime') or backend.runtime is None
+        assert not hasattr(backend, 'tokenizer') or backend.tokenizer is None
         assert backend.tp_size == 1
         assert backend.mem_fraction_static == 0.85
         assert not backend._is_loaded

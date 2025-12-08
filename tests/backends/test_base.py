@@ -61,7 +61,15 @@ class TestBaseBackend:
         # Mock tokenizer with encode/decode methods
         class MockTokenizer:
             def encode(self, text, add_special_tokens=False):
-                return [1, 2, 3] if isinstance(text, str) else [[1, 2], [3, 4]]
+                # Return different values based on input text
+                if text == "test":
+                    return [1, 2, 3]
+                elif text == "test1":
+                    return [1, 2]
+                elif text == "test2":
+                    return [3, 4]
+                else:
+                    return [1, 2, 3]
             
             def decode(self, token_ids, skip_special_tokens=True):
                 if isinstance(token_ids[0], int):
