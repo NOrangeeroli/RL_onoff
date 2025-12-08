@@ -2,11 +2,9 @@
 
 import pytest
 from unittest.mock import MagicMock, patch
+import importlib
 import numpy as np
-from rl_onoff.tasks.rewards.builtin import (
-    ExactMatchReward,
-    MathVerifyReward,
-)
+from rl_onoff.tasks.rewards import builtin
 
 
 class TestExactMatchReward:
@@ -14,47 +12,47 @@ class TestExactMatchReward:
     
     def test_init_default(self):
         """Test initialization with default normalize=True."""
-        reward = ExactMatchReward()
+        reward = builtin.ExactMatchReward()
         assert reward.name == "exact_match"
     
     def test_init_normalize_false(self):
         """Test initialization with normalize=False."""
-        reward = ExactMatchReward(normalize=False)
+        reward = builtin.ExactMatchReward(normalize=False)
         assert reward.name == "exact_match"
     
     def test_compute_exact_match_single(self):
         """Test compute with exact match (single)."""
-        reward = ExactMatchReward()
+        reward = builtin.ExactMatchReward()
         result = reward.compute("hello", "hello")
         assert result == 1.0
     
     def test_compute_no_match_single(self):
         """Test compute with no match (single)."""
-        reward = ExactMatchReward()
+        reward = builtin.ExactMatchReward()
         result = reward.compute("hello", "world")
         assert result == 0.0
     
     def test_compute_exact_match_list(self):
         """Test compute with exact matches (list)."""
-        reward = ExactMatchReward()
+        reward = builtin.ExactMatchReward()
         result = reward.compute(["hello", "world"], ["hello", "world"])
         assert result == [1.0, 1.0]
     
     def test_compute_partial_match_list(self):
         """Test compute with partial matches (list)."""
-        reward = ExactMatchReward()
+        reward = builtin.ExactMatchReward()
         result = reward.compute(["hello", "world"], ["hello", "foo"])
         assert result == [1.0, 0.0]
     
     def test_compute_normalize_true(self):
         """Test compute with normalization enabled."""
-        reward = ExactMatchReward(normalize=True)
+        reward = builtin.ExactMatchReward(normalize=True)
         result = reward.compute("  Hello  ", "hello")
         assert result == 1.0
     
     def test_compute_normalize_false(self):
         """Test compute with normalization disabled."""
-        reward = ExactMatchReward(normalize=False)
+        reward = builtin.ExactMatchReward(normalize=False)
         result = reward.compute("  Hello  ", "hello")
         assert result == 0.0  # No match due to whitespace
     
@@ -62,8 +60,7 @@ class TestExactMatchReward:
     def test_bleu_reward_available(self):
         """Test BLEUReward if available."""
         try:
-            from rl_onoff.tasks.rewards.builtin import BLEUReward
-            reward = BLEUReward()
+            reward = builtin.BLEUReward()
             result = reward.compute("hello world", "hello world")
             assert isinstance(result, (float, int))
         except ImportError:
@@ -73,8 +70,7 @@ class TestExactMatchReward:
     def test_rouge_reward_available(self):
         """Test ROUGEReward if available."""
         try:
-            from rl_onoff.tasks.rewards.builtin import ROUGEReward
-            reward = ROUGEReward()
+            reward = builtin.ROUGEReward()
             result = reward.compute("hello world", "hello world")
             assert isinstance(result, dict)
         except ImportError:
@@ -86,15 +82,17 @@ class TestMathVerifyReward:
     
     def test_init(self):
         """Test initialization."""
-        reward = MathVerifyReward()
-        assert reward.name == "math_verify"
+        try:
+            reward = builtin.MathVerifyReward()
+            assert reward.name == "math_verify"
+        except ImportError:
+            pytest.skip("math_verify not available")
     
     @pytest.mark.skipif(not hasattr(pytest, 'importorskip'), reason="math_verify not available")
     def test_compute_with_math_verify_available(self):
         """Test compute when math_verify is available."""
         try:
-            from math_verify import verify
-            reward = MathVerifyReward()
+            reward = builtin.MathVerifyReward()
             # Test with simple case
             result = reward.compute("2+2", "4")
             assert isinstance(result, (float, int))
@@ -104,16 +102,24 @@ class TestMathVerifyReward:
     
     def test_compute_without_math_verify(self):
         """Test compute when math_verify is not available."""
-        with patch('rl_onoff.tasks.rewards.builtin.MATH_VERIFY_AVAILABLE', False):
-            reward = MathVerifyReward()
-            with pytest.raises(ImportError):
-                reward.compute("2+2", "4")
+        # Patch the module-level constant before creating the reward
+        original_value = builtin.MATH_VERIFY_AVAILABLE
+        try:
+            builtin.MATH_VERIFY_AVAILABLE = False
+            # Reload the module to pick up the change
+            importlib.reload(builtin)
+            # Now creating MathVerifyReward should raise ImportError
+            with pytest.raises(ImportError, match="math_verify is not installed"):
+                reward = builtin.MathVerifyReward()
+        finally:
+            # Restore original value and reload
+            builtin.MATH_VERIFY_AVAILABLE = original_value
+            importlib.reload(builtin)
     
     def test_extract_answer_from_text(self):
         """Test _extract_answer method."""
         try:
-            from rl_onoff.tasks.rewards.builtin import MathVerifyReward
-            reward = MathVerifyReward()
+            reward = builtin.MathVerifyReward()
             
             # Test with boxed answer
             answer = reward._extract_answer("The solution is \\boxed{42}")

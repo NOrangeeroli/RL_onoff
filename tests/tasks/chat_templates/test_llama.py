@@ -81,7 +81,13 @@ class TestLlamaChatTemplate:
         result = template.format(messages, add_generation_prompt=True)
         assert "Hi </s>" in result
         # Should not add generation prompt after assistant
-        assert result.count("<s> [INST]") == 0
+        # The <s> [INST] at the beginning is part of the normal format
+        # The generation prompt would be added at the END if last message is not assistant
+        # Since last message IS assistant, result should end with "</s>"
+        # Count occurrences of "<s> [INST]" - should only be 1 (at the beginning for user message)
+        # and NOT 2 (which would indicate generation prompt was added)
+        assert result.count("<s> [INST]") == 1  # Only the initial one for user message
+        assert result.endswith("</s>")
     
     def test_format_system_not_first(self):
         """Test formatting system message not at the beginning."""

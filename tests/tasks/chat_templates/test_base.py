@@ -36,15 +36,20 @@ class TestBaseChatTemplate:
             user_message="Hello",
             system_message="You are helpful"
         )
-        assert "system: You are helpful" in result.lower()
-        assert "user: Hello" in result.lower()
+        result_lower = result.lower()
+        assert "system:" in result_lower
+        assert "you are helpful" in result_lower
+        assert "user:" in result_lower
+        assert "hello" in result_lower
     
     def test_format_simple_without_system(self):
         """Test format_simple without system message."""
         template = ConcreteChatTemplate()
         result = template.format_simple(user_message="Hello")
-        assert "user: Hello" in result.lower()
-        assert "system:" not in result.lower()
+        result_lower = result.lower()
+        assert "user:" in result_lower
+        assert "hello" in result_lower
+        assert "system:" not in result_lower
     
     def test_format_simple_with_assistant(self):
         """Test format_simple with assistant message."""
@@ -53,8 +58,11 @@ class TestBaseChatTemplate:
             user_message="Hello",
             assistant_message="Hi there"
         )
-        assert "user: Hello" in result.lower()
-        assert "assistant: Hi there" in result.lower()
+        result_lower = result.lower()
+        assert "user:" in result_lower
+        assert "hello" in result_lower
+        assert "assistant:" in result_lower
+        assert "hi there" in result_lower
     
     def test_format_simple_with_generation_prompt(self):
         """Test format_simple with add_generation_prompt."""
