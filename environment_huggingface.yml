@@ -14,8 +14,6 @@ dependencies:
   
   # PyTorch ecosystem (flexible version for HuggingFace)
   - pytorch>=2.0.0
-  - pytorch-cuda=11.8  # CUDA support (adjust version as needed)
-  - cudatoolkit=11.8  # CUDA toolkit (if needed)
   
   # CLI and utilities
   - click>=8.1.0
