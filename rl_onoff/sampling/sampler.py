@@ -124,7 +124,7 @@ if __name__ == "__main__":
         print("=" * 60)
         
         # Initialize backend (using a small model for demonstration)
-        model_name = "gpt2"  # Replace with your preferred model
+        model_name = "meta-llama/Llama-3.2-1B"  # Replace with your preferred model
         backend = HuggingFaceBackend(model_name=model_name)
         
         # Create sampler
