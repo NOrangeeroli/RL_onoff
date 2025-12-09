@@ -45,8 +45,8 @@ def main():
     print(f"Loaded {len(dataset)} examples")
     
     # Get all questions and answers
-    questions = dataset.get_questions()
-    answers = dataset.get_answers()
+    questions = dataset.get_questions()[:10]
+    answers = dataset.get_answers()[:10]
     
     # Initialize backend
     print("\nInitializing HuggingFace backend...")
