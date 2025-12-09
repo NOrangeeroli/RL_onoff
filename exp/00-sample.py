@@ -24,12 +24,22 @@ from rl_onoff.backends import create_backend
 from rl_onoff.backends.config import BackendConfig
 from rl_onoff.sampling import Sampler
 from rl_onoff.sampling.config import SamplingConfig
-from rl_onoff.tasks.math import MathTask
+from rl_onoff.tasks import create_task
 from rl_onoff.utils.dataset import GSM8KLevel1Dataset
 
 
-def main():
-    """Main function to sample responses for GSM8K dataset."""
+def main(
+    task_config: str = None,
+    dataset_split: str = "test",
+    num_examples: int = None
+):
+    """Main function to sample responses for GSM8K dataset.
+    
+    Args:
+        task_config: Path to task config file (default: math_default.yaml)
+        dataset_split: Dataset split to use ("test" or "train")
+        num_examples: Number of examples to process (None for all)
+    """
     # Set up output directory
     output_dir = Path(__file__).parent / "00-sample" / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -38,15 +48,32 @@ def main():
     print("GSM8K Sampling Experiment")
     print("=" * 80)
     
+    # Load task config
+    if task_config is None:
+        task_config = project_root / "rl_onoff" / "tasks" / "configs" / "math_default.yaml"
+    else:
+        task_config = Path(task_config)
+    
+    print(f"\nLoading task config from {task_config}...")
+    task = create_task(task_config)
+    print(f"Task: template={task.config.template_type}, "
+          f"format={task.config.format_type}, "
+          f"reward={task.config.reward_type}")
+    
     # Load GSM8K dataset
-    print("\nLoading GSM8K Level 1 test dataset...")
-    dataset = GSM8KLevel1Dataset(split="test")
+    print(f"\nLoading GSM8K Level 1 {dataset_split} dataset...")
+    dataset = GSM8KLevel1Dataset(split=dataset_split)
     dataset.load()
     print(f"Loaded {len(dataset)} examples")
     
     # Get all questions and answers
-    questions = dataset.get_questions()[:10]
-    answers = dataset.get_answers()[:10]
+    questions = dataset.get_questions()
+    answers = dataset.get_answers()
+    
+    if num_examples is not None:
+        questions = questions[:num_examples]
+        answers = answers[:num_examples]
+        print(f"Processing first {num_examples} examples")
     
     # Initialize backend
     print("\nInitializing HuggingFace backend...")
@@ -69,13 +96,6 @@ def main():
     print(f"Sampling config: max_length={sampling_config.max_length}, "
           f"temperature={sampling_config.temperature}, "
           f"num_samples={sampling_config.num_samples}")
-    
-    # Initialize MathTask
-    print("\nInitializing MathTask...")
-    task = MathTask()
-    print(f"Task: template={task.config.template_type}, "
-          f"format={task.config.format_type}, "
-          f"reward={task.config.reward_type}")
     
     # Format all questions into prompts
     print("\n" + "=" * 80)
@@ -154,9 +174,10 @@ def main():
     avg_length = total_length / total_samples if total_samples > 0 else 0.0
     
     statistics = {
-        "dataset": "GSM8K Level 1 (test)",
+        "dataset": f"GSM8K Level 1 ({dataset_split})",
         "model": "meta-llama/Llama-3.2-1B",
         "backend": "huggingface",
+        "task_config_path": str(task_config),
         "num_examples": len(all_results),
         "num_samples_per_example": sampling_config.num_samples,
         "total_samples": total_samples,
@@ -209,5 +230,33 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Sample responses for GSM8K dataset")
+    parser.add_argument(
+        "--task-config",
+        type=str,
+        default=None,
+        help="Path to task config file (default: math_default.yaml)"
+    )
+    parser.add_argument(
+        "--dataset-split",
+        type=str,
+        default="test",
+        choices=["test", "train"],
+        help="Dataset split to use (default: test)"
+    )
+    parser.add_argument(
+        "--num-examples",
+        type=int,
+        default=None,
+        help="Number of examples to process (default: all)"
+    )
+    
+    args = parser.parse_args()
+    main(
+        task_config=args.task_config,
+        dataset_split=args.dataset_split,
+        num_examples=args.num_examples
+    )
 
