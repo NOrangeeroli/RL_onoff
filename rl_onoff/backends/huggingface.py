@@ -109,6 +109,18 @@ class HuggingFaceBackend(BaseBackend):
             print(f"Wrapping model with DataParallel for {torch.cuda.device_count()} GPUs")
             print("  Each GPU will process different prompts in the batch")
             self.model = torch.nn.DataParallel(self.model)
+            # Print actual devices that will be used
+            devices_used = [f"cuda:{i}" for i in range(torch.cuda.device_count())]
+            print(f"  Devices used for generation: {devices_used}")
+        elif "device_map" in model_kwargs:
+            # When using device_map, print the actual device mapping
+            if hasattr(self.model, 'hf_device_map'):
+                print(f"  Model device mapping: {self.model.hf_device_map}")
+            else:
+                print(f"  Using device_map: {model_kwargs['device_map']}")
+        else:
+            # Single device case
+            print(f"  Device used for generation: {self.device}")
         
         self.model.eval()
         self._is_loaded = True
