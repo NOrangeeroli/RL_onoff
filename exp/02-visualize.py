@@ -247,6 +247,11 @@ def main():
         token_strings = selected_sample.get("token_strings", [])
         per_token_entropy = selected_sample.get("per_token_entropy", [])
         
+        # Debug: Check if entropy data exists and matches token count
+        if token_strings and per_token_entropy:
+            if len(token_strings) != len(per_token_entropy):
+                st.warning(f"⚠️ Mismatch: {len(token_strings)} tokens but {len(per_token_entropy)} entropy values")
+        
         if not token_strings or not per_token_entropy:
             st.text_area("Response", response, height=300, disabled=True, label_visibility="collapsed")
         else:
@@ -300,11 +305,19 @@ def main():
                 if selected_token_idx < len(distributions):
                     token_dist = distributions[selected_token_idx]
                     
-                    # Get top tokens
-                    top_k = st.slider("Number of top tokens to show", 10, 50, 20)
-                    top_tokens = get_top_tokens(token_dist, top_k=top_k)
+                    # Get all tokens or top K
+                    show_all = st.checkbox("Show all tokens (may be slow for large vocabularies)", value=False)
+                    if show_all:
+                        # Get all tokens sorted by probability
+                        all_indices = np.argsort(token_dist)[::-1]  # Sort descending
+                        top_tokens = [(int(idx), float(token_dist[idx])) for idx in all_indices]
+                    else:
+                        top_k = st.slider("Number of top tokens to show", 10, 1000, 50)
+                        top_tokens = get_top_tokens(token_dist, top_k=top_k)
                     
                     # Create bar chart (will be created later with token labels)
+                    # Ensure sorted by probability (descending)
+                    top_tokens = sorted(top_tokens, key=lambda x: x[1], reverse=True)
                     probs = [t[1] for t in top_tokens]
                     
                     # Show details with bounds checking
@@ -319,10 +332,13 @@ def main():
                     else:
                         st.write(f"**Token ID:** N/A")
                     
-                    if selected_token_idx < len(per_token_entropy):
+                    # Get entropy with proper bounds checking
+                    if per_token_entropy and selected_token_idx < len(per_token_entropy):
                         st.write(f"**Entropy:** {per_token_entropy[selected_token_idx]:.4f}")
+                    elif per_token_entropy:
+                        st.write(f"**Entropy:** N/A (index {selected_token_idx} out of range, len={len(per_token_entropy)})")
                     else:
-                        st.write(f"**Entropy:** N/A (index out of range)")
+                        st.write(f"**Entropy:** N/A (no entropy data available)")
                     
                     # Get tokenizer to decode token IDs
                     statistics = data.get("statistics", {})
@@ -349,19 +365,24 @@ def main():
                         token_labels = [f"Token {tid}" for tid, _ in top_tokens]
                     
                     # Create DataFrame for better chart with labels
+                    # Ensure data is sorted by probability (descending) for display
                     try:
                         import pandas as pd
+                        # Create DataFrame and sort by probability descending
                         chart_df = pd.DataFrame({
                             "Token": token_labels,
                             "Probability": probs
                         })
+                        # Sort by probability descending to ensure bars are ordered
+                        chart_df = chart_df.sort_values("Probability", ascending=False)
                         chart_df = chart_df.set_index("Token")
                         st.bar_chart(chart_df)
                     except ImportError:
-                        # Fallback if pandas not available
-                        chart_data = {"Probability": probs}
+                        # Fallback if pandas not available - create dict sorted by value
+                        sorted_data = sorted(zip(token_labels, probs), key=lambda x: x[1], reverse=True)
+                        chart_data = {"Probability": [p for _, p in sorted_data]}
                         st.bar_chart(chart_data)
-                        st.caption("Token labels: " + ", ".join(token_labels[:5]) + "...")
+                        st.caption("Token labels: " + ", ".join([l for l, _ in sorted_data[:5]]) + "...")
                     
                     # Show top tokens table
                     with st.expander("Top tokens (expand to see details)"):
