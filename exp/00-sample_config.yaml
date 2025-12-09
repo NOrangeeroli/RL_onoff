@@ -1,0 +1,24 @@
+# Configuration for 00-sample.py experiment
+
+# Task configuration
+task_config: "rl_onoff/tasks/configs/math_default.yaml"  # Path to task config file
+
+# Dataset configuration
+dataset:
+  name: "gsm8k_level1"  # Dataset name
+  split: "test"  # "test" or "train"
+  num_examples: null  # null = process all, or integer to limit
+
+# Backend configuration
+backend:
+  backend_type: "huggingface"
+  model_name: "meta-llama/Llama-3.2-3B"
+  # Additional backend config can be added here if needed
+
+# Sampling configuration
+sampling_config: "rl_onoff/sampling/configs/default.yaml"  # Path to sampling config file
+
+# Output configuration
+output:
+  dir: "exp/00-sample/output"  # Output directory (relative to project root)
+

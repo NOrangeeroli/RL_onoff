@@ -11,8 +11,9 @@ This script:
 
 import json
 import sys
+import yaml
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Optional
 from tqdm import tqdm
 
 # Add project root to Python path
@@ -28,20 +29,43 @@ from rl_onoff.tasks import create_task
 from rl_onoff.utils.dataset import GSM8KLevel1Dataset
 
 
+def load_experiment_config(config_path: Optional[str] = None) -> dict:
+    """Load experiment configuration from YAML file.
+    
+    Args:
+        config_path: Path to config file (default: 00-sample_config.yaml in same directory)
+        
+    Returns:
+        Dictionary with configuration
+    """
+    if config_path is None:
+        config_path = Path(__file__).parent / "00-sample_config.yaml"
+    else:
+        config_path = Path(config_path)
+    
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+    
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
+    
+    return config
+
+
 def main(
-    task_config: str = None,
-    dataset_split: str = "test",
-    num_examples: int = None
+    experiment_config_path: Optional[str] = None
 ):
     """Main function to sample responses for GSM8K dataset.
     
     Args:
-        task_config: Path to task config file (default: math_default.yaml)
-        dataset_split: Dataset split to use ("test" or "train")
-        num_examples: Number of examples to process (None for all)
+        experiment_config_path: Path to experiment config file (default: 00-sample_config.yaml)
     """
+    # Load experiment configuration
+    exp_config = load_experiment_config(experiment_config_path)
+    
     # Set up output directory
-    output_dir = Path(__file__).parent / "00-sample" / "output"
+    output_dir_str = exp_config.get("output", {}).get("dir", "exp/00-sample/output")
+    output_dir = (project_root / output_dir_str).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     
     print("=" * 80)
@@ -49,20 +73,26 @@ def main(
     print("=" * 80)
     
     # Load task config
-    if task_config is None:
-        task_config = project_root / "rl_onoff" / "tasks" / "configs" / "math_default.yaml"
-    else:
-        task_config = Path(task_config)
-    
+    task_config_path = exp_config.get("task_config", "rl_onoff/tasks/configs/math_default.yaml")
+    task_config = project_root / task_config_path
     print(f"\nLoading task config from {task_config}...")
     task = create_task(task_config)
     print(f"Task: template={task.config.template_type}, "
           f"format={task.config.format_type}, "
           f"reward={task.config.reward_type}")
     
-    # Load GSM8K dataset
-    print(f"\nLoading GSM8K Level 1 {dataset_split} dataset...")
-    dataset = GSM8KLevel1Dataset(split=dataset_split)
+    # Load dataset
+    dataset_config = exp_config.get("dataset", {})
+    dataset_name = dataset_config.get("name", "gsm8k_level1")
+    dataset_split = dataset_config.get("split", "test")
+    num_examples = dataset_config.get("num_examples")
+    
+    print(f"\nLoading {dataset_name} {dataset_split} dataset...")
+    if dataset_name == "gsm8k_level1":
+        dataset = GSM8KLevel1Dataset(split=dataset_split)
+    else:
+        raise ValueError(f"Unknown dataset: {dataset_name}")
+    
     dataset.load()
     print(f"Loaded {len(dataset)} examples")
     
@@ -76,10 +106,12 @@ def main(
         print(f"Processing first {num_examples} examples")
     
     # Initialize backend
-    print("\nInitializing HuggingFace backend...")
+    backend_config_dict = exp_config.get("backend", {})
+    print("\nInitializing backend...")
     backend_config = BackendConfig(
-        backend_type="huggingface",
-        model_name="meta-llama/Llama-3.2-3B"
+        backend_type=backend_config_dict.get("backend_type", "huggingface"),
+        model_name=backend_config_dict.get("model_name", "meta-llama/Llama-3.2-3B"),
+        **backend_config_dict.get("backend_kwargs", {})
     )
     backend = create_backend(backend_config)
     backend.load()
@@ -89,9 +121,10 @@ def main(
     print("\nInitializing sampler...")
     sampler = Sampler(backend)
     
-    # Load default sampling config
-    print("\nLoading default sampling config...")
-    sampling_config_path = project_root / "rl_onoff" / "sampling" / "configs" / "default.yaml"
+    # Load sampling config
+    sampling_config_path_str = exp_config.get("sampling_config", "rl_onoff/sampling/configs/default.yaml")
+    sampling_config_path = project_root / sampling_config_path_str
+    print(f"\nLoading sampling config from {sampling_config_path}...")
     sampling_config = SamplingConfig.from_file(sampling_config_path)
     print(f"Sampling config: max_length={sampling_config.max_length}, "
           f"temperature={sampling_config.temperature}, "
@@ -174,9 +207,9 @@ def main(
     avg_length = total_length / total_samples if total_samples > 0 else 0.0
     
     statistics = {
-        "dataset": f"GSM8K Level 1 ({dataset_split})",
-        "model": "meta-llama/Llama-3.2-1B",
-        "backend": "huggingface",
+        "dataset": f"{dataset_name} ({dataset_split})",
+        "model": backend_config.model_name,
+        "backend": backend_config.backend_type,
         "task_config_path": str(task_config),
         "num_examples": len(all_results),
         "num_samples_per_example": sampling_config.num_samples,
@@ -234,29 +267,12 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="Sample responses for GSM8K dataset")
     parser.add_argument(
-        "--task-config",
+        "--config",
         type=str,
         default=None,
-        help="Path to task config file (default: math_default.yaml)"
-    )
-    parser.add_argument(
-        "--dataset-split",
-        type=str,
-        default="test",
-        choices=["test", "train"],
-        help="Dataset split to use (default: test)"
-    )
-    parser.add_argument(
-        "--num-examples",
-        type=int,
-        default=None,
-        help="Number of examples to process (default: all)"
+        help="Path to experiment config file (default: 00-sample_config.yaml)"
     )
     
     args = parser.parse_args()
-    main(
-        task_config=args.task_config,
-        dataset_split=args.dataset_split,
-        num_examples=args.num_examples
-    )
+    main(experiment_config_path=args.config)
 
