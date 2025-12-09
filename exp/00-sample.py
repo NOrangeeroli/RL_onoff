@@ -77,9 +77,25 @@ def main():
           f"format={task.config.format_type}, "
           f"reward={task.config.reward_type}")
     
-    # Process each question
+    # Format all questions into prompts
+    print("\n" + "=" * 80)
+    print("Formatting prompts...")
+    print("=" * 80)
+    prompts = []
+    for question in tqdm(questions, desc="Formatting"):
+        prompt = task.format_query(question)
+        prompts.append(prompt)
+    
+    # Generate responses for all prompts at once
     print("\n" + "=" * 80)
     print("Generating responses...")
+    print("=" * 80)
+    print(f"Generating {sampling_config.num_samples} sample(s) per prompt for {len(prompts)} prompts...")
+    all_responses = sampler.sample(prompts, config=sampling_config)
+    
+    # Process results
+    print("\n" + "=" * 80)
+    print("Evaluating responses...")
     print("=" * 80)
     
     all_results = []
@@ -87,20 +103,14 @@ def main():
     total_length = 0
     num_correct = 0
     
-    for i, (question, reference_answer) in enumerate(tqdm(zip(questions, answers), total=len(questions), desc="Processing")):
-        # Format question using task
-        prompt = task.format_query(question)
-        
-        # Generate response(s)
-        responses = sampler.sample([prompt], config=sampling_config)
-        
+    for i, (question, reference_answer, responses) in enumerate(tqdm(zip(questions, answers, all_responses), total=len(questions), desc="Evaluating")):
         # Handle multiple samples per prompt
         if sampling_config.num_samples > 1:
-            # responses is a list of lists, get first (and only) prompt's responses
-            response_list = responses[0]
+            # responses is a list of samples for this prompt
+            response_list = responses
         else:
-            # responses is a list of strings, get first (and only) prompt's response
-            response_list = [responses[0]] if isinstance(responses, list) else [responses]
+            # responses is a single string for this prompt
+            response_list = [responses]
         
         # Evaluate each response
         sample_results = []
@@ -132,7 +142,7 @@ def main():
             "example_id": i,
             "question": question,
             "reference_answer": reference_answer,
-            "prompt": prompt,
+            "prompt": prompts[i],
             "samples": sample_results
         }
         all_results.append(result)

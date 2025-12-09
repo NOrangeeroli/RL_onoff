@@ -2,6 +2,15 @@
 
 from typing import List, Dict, Optional, Union, Any
 
+try:
+    from tqdm import tqdm
+    TQDM_AVAILABLE = True
+except ImportError:
+    TQDM_AVAILABLE = False
+    # Dummy tqdm if not available
+    def tqdm(iterable, *args, **kwargs):
+        return iterable
+
 from rl_onoff.backends.base import BaseBackend
 from rl_onoff.sampling.config import SamplingConfig
 
@@ -48,50 +57,50 @@ class Sampler:
         if config.stop_strings is not None:
             gen_kwargs["stop_strings"] = config.stop_strings
 
-        all_results = []
-        batch_size = config.batch_size
-
-        if batch_size is None:
-            # Process all prompts at once in a single batch
-            if config.num_samples == 1:
-                # Single sample per prompt: batch all prompts together
-                results = self.backend.generate(prompts, **gen_kwargs)
-                all_results = results
-            else:
-                # Multiple samples per prompt: batch all prompts for each sample iteration
-                for sample_idx in range(config.num_samples):
-                    batch_results = self.backend.generate(prompts, **gen_kwargs)
-                    if sample_idx == 0:
-                        # Initialize with lists for each prompt
-                        all_results = [[result] for result in batch_results]
-                    else:
-                        # Append to existing lists
-                        for i, result in enumerate(batch_results):
-                            all_results[i].append(result)
-        else:
-            # Process in batches
-            if config.num_samples == 1:
-                # Single sample per prompt: process in batches
-                for i in range(0, len(prompts), batch_size):
-                    batch_prompts = prompts[i:i + batch_size]
-                    batch_results = self.backend.generate(batch_prompts, **gen_kwargs)
-                    all_results.extend(batch_results)
-            else:
-                # Multiple samples per prompt: for each sample iteration, process in batches
-                for sample_idx in range(config.num_samples):
-                    for i in range(0, len(prompts), batch_size):
-                        batch_prompts = prompts[i:i + batch_size]
-                        batch_results = self.backend.generate(batch_prompts, **gen_kwargs)
-                        if sample_idx == 0:
-                            # Initialize for first sample
-                            all_results.extend([[result] for result in batch_results])
-                        else:
-                            # Append to existing lists
-                            start_idx = i
-                            for j, result in enumerate(batch_results):
-                                all_results[start_idx + j].append(result)
+        # Step 1: Duplicate prompts num_samples times
+        # If num_samples=3 and prompts=[p1, p2], we get [p1, p1, p1, p2, p2, p2]
+        expanded_prompts = []
+        for prompt in prompts:
+            expanded_prompts.extend([prompt] * config.num_samples)
         
-        return all_results
+        # Step 2: Batchify the expanded prompts list
+        batch_size = config.batch_size
+        all_generated = []
+        
+        if batch_size is None:
+            # Process all expanded prompts at once
+            all_generated = self.backend.generate(expanded_prompts, **gen_kwargs)
+        else:
+            # Process in batches with progress bar
+            num_batches = (len(expanded_prompts) + batch_size - 1) // batch_size
+            batch_range = range(0, len(expanded_prompts), batch_size)
+            
+            if TQDM_AVAILABLE:
+                batch_range = tqdm(batch_range, desc="Generating", total=num_batches, unit="batch")
+            
+            for i in batch_range:
+                batch_prompts = expanded_prompts[i:i + batch_size]
+                batch_results = self.backend.generate(batch_prompts, **gen_kwargs)
+                all_generated.extend(batch_results)
+        
+        # Step 3: Group results by original prompt
+        # Convert flat list back to grouped structure
+        # all_generated = [s1_1, s1_2, s1_3, s2_1, s2_2, s2_3, ...]
+        # Should become [[s1_1, s1_2, s1_3], [s2_1, s2_2, s2_3], ...]
+        grouped_results = []
+        for i in range(len(prompts)):
+            start_idx = i * config.num_samples
+            end_idx = start_idx + config.num_samples
+            prompt_samples = all_generated[start_idx:end_idx]
+            
+            if config.num_samples == 1:
+                # Return single string instead of list
+                grouped_results.append(prompt_samples[0])
+            else:
+                # Return list of samples
+                grouped_results.append(prompt_samples)
+        
+        return grouped_results
 
 
 if __name__ == "__main__":
