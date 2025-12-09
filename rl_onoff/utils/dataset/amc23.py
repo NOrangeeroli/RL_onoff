@@ -22,8 +22,11 @@ class AMC23Dataset(BaseDataset):
         """Extract question from entry."""
         prompt = entry.get("prompt", {})
         if isinstance(prompt, dict):
-            return prompt.get("content", "")
-        return str(prompt)
+            content = prompt.get("content", "")
+            # Ensure it's a string
+            return str(content) if content else ""
+        # If prompt is not a dict, convert to string
+        return str(prompt) if prompt else ""
     
     def extract_answer(self, entry: Dict) -> str:
         """Extract answer from entry."""

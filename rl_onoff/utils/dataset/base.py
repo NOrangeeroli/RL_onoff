@@ -93,7 +93,8 @@ class BaseDataset(ABC):
         entry = self._data[idx]
         question = self.extract_question(entry)
         answer = self.extract_answer(entry)
-        return question, answer
+        # Ensure both are strings
+        return str(question), str(answer)
     
     def get_all(self) -> List[Tuple[str, str]]:
         """Get all question-answer pairs.
@@ -115,7 +116,7 @@ class BaseDataset(ABC):
         if self._data is None:
             self.load()
         
-        return [self.extract_question(entry) for entry in self._data]
+        return [str(self.extract_question(entry)) for entry in self._data]
     
     def get_answers(self) -> List[str]:
         """Get all answers.
@@ -126,5 +127,5 @@ class BaseDataset(ABC):
         if self._data is None:
             self.load()
         
-        return [self.extract_answer(entry) for entry in self._data]
+        return [str(self.extract_answer(entry)) for entry in self._data]
 

@@ -25,12 +25,15 @@ class GSM8KLevel1Dataset(BaseDataset):
         if isinstance(extra_info, dict):
             question = extra_info.get("question")
             if question:
-                return str(question)
+                return str(question) if question else ""
         
         prompt = entry.get("prompt", {})
         if isinstance(prompt, dict):
-            return prompt.get("content", "")
-        return str(prompt)
+            content = prompt.get("content", "")
+            # Ensure it's a string
+            return str(content) if content else ""
+        # If prompt is not a dict, convert to string
+        return str(prompt) if prompt else ""
     
     def extract_answer(self, entry: Dict) -> str:
         """Extract answer from entry."""
