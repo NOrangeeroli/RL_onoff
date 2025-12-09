@@ -14,7 +14,7 @@ import yaml
 import numpy as np
 import traceback
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union, Union
 from tqdm import tqdm
 
 # Add project root to Python path
@@ -156,6 +156,7 @@ def main(
     print("=" * 80)
     
     all_dist_results = []
+    all_distributions = []  # Store all distributions for compact saving
     
     for result in tqdm(results, desc="Processing examples"):
         example_id = result.get("example_id", 0)
@@ -198,15 +199,16 @@ def main(
                     print(f"\nWarning: Token ID count ({len(token_ids)}) != token string count ({len(token_strings)}) "
                           f"for example {example_id}, sample {sample_id}")
                 
-                # Convert distributions to list for JSON serialization
-                distributions_list = convert_numpy_to_list(distributions)
+                # Store distribution in compact format (will save to NPZ later)
+                dist_index = len(all_distributions)
+                all_distributions.append(distributions)
                 
                 sample_dist_result = {
                     "sample_id": sample_id,
                     "response": response,
                     "token_ids": token_ids,
                     "token_strings": token_strings,  # Response split into tokens as tokenized
-                    "distributions": distributions_list,  # Shape: (num_tokens, vocab_size)
+                    "distribution_index": dist_index,  # Index into the distributions array
                     "distribution_shape": list(distributions.shape) if isinstance(distributions, np.ndarray) else None,
                     "num_tokens": len(token_ids)
                 }
@@ -246,15 +248,29 @@ def main(
         "input_file": str(input_results_path)
     }
     
-    # Save results
+    # Save distributions in compact NPZ format
+    distributions_file = output_dir / "distributions.npz"
+    print(f"\nSaving distributions to {distributions_file}...")
+    if all_distributions:
+        # Save all distributions as a dictionary of arrays
+        # Key format: "dist_{index}" for each distribution
+        distributions_dict = {f"dist_{i}": dist for i, dist in enumerate(all_distributions)}
+        np.savez_compressed(distributions_file, **distributions_dict)
+        print(f"Saved {len(all_distributions)} distributions to {distributions_file}")
+    else:
+        print("No distributions to save")
+    
+    # Save metadata (without distributions) in JSON
     results_file = output_dir / "distributions.json"
-    print(f"\nSaving distributions to {results_file}...")
+    print(f"\nSaving metadata to {results_file}...")
     with open(results_file, 'w', encoding='utf-8') as f:
         json.dump({
             "statistics": statistics,
-            "results": all_dist_results
+            "results": all_dist_results,
+            "distributions_file": str(distributions_file.name),  # Store relative filename
+            "num_distributions": len(all_distributions)
         }, f, indent=2, ensure_ascii=False)
-    print(f"Saved {len(all_dist_results)} examples to {results_file}")
+    print(f"Saved {len(all_dist_results)} examples metadata to {results_file}")
     
     # Save statistics
     stats_file = output_dir / "statistics.json"
@@ -273,6 +289,67 @@ def main(
     print(f"Average tokens per sample: {total_tokens / total_samples if total_samples > 0 else 0:.1f}")
     print(f"Distribution type: {'logits' if use_logits else 'probabilities'}")
     print("=" * 80)
+
+
+def load_distributions(
+    json_file: Union[str, Path],
+    distributions_file: Optional[Union[str, Path]] = None
+) -> Dict:
+    """Load distributions from JSON metadata and NPZ distributions file.
+    
+    This function reconstructs the full data structure by loading distributions
+    from the compact NPZ file and merging them with the JSON metadata.
+    
+    Args:
+        json_file: Path to the distributions.json metadata file
+        distributions_file: Path to the distributions.npz file (if None, inferred from json_file)
+        
+    Returns:
+        Dictionary with the same structure as the original distributions.json,
+        but with 'distributions' arrays included in each sample (as lists)
+    """
+    json_path = Path(json_file)
+    if not json_path.exists():
+        raise FileNotFoundError(f"JSON file not found: {json_path}")
+    
+    # Load JSON metadata
+    with open(json_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    
+    # Determine distributions file path
+    if distributions_file is None:
+        # Try to get from metadata, or infer from JSON file location
+        dist_filename = data.get("distributions_file", "distributions.npz")
+        distributions_file = json_path.parent / dist_filename
+    else:
+        distributions_file = Path(distributions_file)
+    
+    if not distributions_file.exists():
+        raise FileNotFoundError(f"Distributions file not found: {distributions_file}")
+    
+    # Load distributions from NPZ
+    print(f"Loading distributions from {distributions_file}...")
+    distributions_data = np.load(distributions_file)
+    print(f"Loaded {len(distributions_data.files)} distributions")
+    
+    # Reconstruct full structure by adding distributions to each sample
+    results = data.get("results", [])
+    for example_result in results:
+        for sample in example_result.get("samples", []):
+            if "error" in sample:
+                # Skip samples with errors
+                continue
+            
+            dist_index = sample.get("distribution_index")
+            if dist_index is not None:
+                # Load the distribution array
+                dist_key = f"dist_{dist_index}"
+                if dist_key in distributions_data:
+                    sample["distributions"] = distributions_data[dist_key].tolist()
+                else:
+                    print(f"Warning: Distribution index {dist_index} not found in NPZ file")
+    
+    return data
 
 
 if __name__ == "__main__":
