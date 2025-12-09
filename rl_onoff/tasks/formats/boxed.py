@@ -50,23 +50,8 @@ class BoxedFormat(BaseFormat):
             reasoning = response[:match.start()].strip()
             return {"reasoning": reasoning, "answer": answer}
         else:
-            # Fallback: try to extract answer using common patterns - match last occurrence
-            answer_patterns = [
-                r'(?:the\s+)?answer\s+is\s*:?\s*([^\n\.]+)',
-                r'answer\s*:?\s*([^\n\.]+)',
-                r'final\s+answer\s*:?\s*([^\n\.]+)',
-            ]
             
-            for pattern in answer_patterns:
-                matches = list(re.finditer(pattern, response, re.IGNORECASE))
-                if matches:
-                    # Use the last match
-                    match = matches[-1]
-                    answer = match.group(1).strip().rstrip('.,;!?')
-                    reasoning = response[:match.start()].strip()
-                    return {"reasoning": reasoning, "answer": answer}
-            
-            # If no answer found, return full response as reasoning
+               
             return {"reasoning": response, "answer": None}
 
 

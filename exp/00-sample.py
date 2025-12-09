@@ -52,7 +52,7 @@ def main():
     print("\nInitializing HuggingFace backend...")
     backend_config = BackendConfig(
         backend_type="huggingface",
-        model_name="meta-llama/Llama-3.2-1B"
+        model_name="Qwen/Qwen3-4B"
     )
     backend = create_backend(backend_config)
     backend.load()
