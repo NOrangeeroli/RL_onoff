@@ -93,6 +93,51 @@ def convert_numpy_to_list(obj):
     return obj
 
 
+def calculate_entropy(probs: np.ndarray) -> float:
+    """Calculate entropy from a probability distribution.
+    
+    Args:
+        probs: Probability distribution array (should sum to 1)
+        
+    Returns:
+        Entropy value in nats (natural log)
+    """
+    # Clip probabilities to avoid log(0)
+    probs = np.clip(probs, 1e-10, 1.0)
+    # Calculate entropy: H = -Σ p * log(p)
+    entropy = -np.sum(probs * np.log(probs))
+    return float(entropy)
+
+
+def calculate_per_token_entropy(distributions: np.ndarray, use_logits: bool = False, temperature: float = 1.0) -> List[float]:
+    """Calculate entropy for each token position from distributions.
+    
+    Args:
+        distributions: Distribution array with shape (num_tokens, vocab_size)
+                       Can be logits or probabilities
+        use_logits: If True, distributions are logits; if False, they are probabilities
+        temperature: Temperature for converting logits to probabilities (if use_logits=True)
+        
+    Returns:
+        List of entropy values, one per token position
+    """
+    if use_logits:
+        # Convert logits to probabilities using temperature
+        scaled_logits = distributions / temperature
+        exp_logits = np.exp(scaled_logits - np.max(scaled_logits, axis=-1, keepdims=True))
+        probs = exp_logits / np.sum(exp_logits, axis=-1, keepdims=True)
+    else:
+        probs = distributions
+    
+    # Calculate entropy for each token position
+    per_token_entropy = []
+    for i in range(probs.shape[0]):
+        entropy = calculate_entropy(probs[i])
+        per_token_entropy.append(entropy)
+    
+    return per_token_entropy
+
+
 def main(
     experiment_config_path: Optional[str] = None
 ):
@@ -199,6 +244,13 @@ def main(
                     print(f"\nWarning: Token ID count ({len(token_ids)}) != token string count ({len(token_strings)}) "
                           f"for example {example_id}, sample {sample_id}")
                 
+                # Calculate per-token entropy
+                per_token_entropy = calculate_per_token_entropy(
+                    distributions,
+                    use_logits=use_logits,
+                    temperature=temperature
+                )
+                
                 # Store distribution in compact format (will save to NPZ later)
                 dist_index = len(all_distributions)
                 all_distributions.append(distributions)
@@ -210,7 +262,8 @@ def main(
                     "token_strings": token_strings,  # Response split into tokens as tokenized
                     "distribution_index": dist_index,  # Index into the distributions array
                     "distribution_shape": list(distributions.shape) if isinstance(distributions, np.ndarray) else None,
-                    "num_tokens": len(token_ids)
+                    "num_tokens": len(token_ids),
+                    "per_token_entropy": per_token_entropy  # Entropy for each token position
                 }
                 
                 example_dist_results["samples"].append(sample_dist_result)
