@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Experimental script 02: Visualize token distributions and entropy.
 
-Simplified version for debugging - just shows first prompt-response pair.
+Interactive Streamlit app for visualizing token-wise distributions.
 """
 
 import json
 import sys
 import numpy as np
 from pathlib import Path
-from typing import Dict, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 import streamlit as st
 
 # Add project root to Python path
@@ -26,11 +26,9 @@ def load_distributions(
     if not json_path.exists():
         raise FileNotFoundError(f"JSON file not found: {json_path}")
     
-    st.write("📂 Loading JSON metadata...")
     # Load JSON metadata
     with open(json_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
-    st.write(f"✅ JSON loaded. Found {len(data.get('results', []))} examples.")
     
     # Determine distributions file path
     if distributions_file is None:
@@ -39,17 +37,8 @@ def load_distributions(
     else:
         distributions_file = Path(distributions_file)
     
-    if not distributions_file.exists():
-        st.warning(f"⚠️ NPZ file not found: {distributions_file}")
-        return data
-    
-    st.write(f"📦 NPZ file found: {distributions_file}")
-    st.write(f"📊 File size: {distributions_file.stat().st_size / 1e9:.2f} GB")
-    st.write("⏭️ Skipping bulk distribution loading (will load on-demand)")
-    
-    # SKIP loading all distributions - this is the bottleneck!
-    # Converting 6.30 GB to Python lists takes forever and uses too much memory
-    # We'll load distributions on-demand when needed
+    # Store distributions file path in data for later use
+    data["_distributions_file"] = str(distributions_file)
     
     return data
 
@@ -70,22 +59,80 @@ def load_single_distribution(distributions_file: Path, dist_index: int) -> Optio
         dist_key = f"dist_{dist_index}"
         if dist_key in distributions_data:
             return distributions_data[dist_key]
-        else:
-            st.warning(f"Distribution index {dist_index} not found in NPZ file")
     except Exception as e:
         st.error(f"Error loading distribution {dist_index}: {e}")
-        import traceback
-        with st.expander("Error Details"):
-            st.code(traceback.format_exc())
     return None
 
 
-def main():
-    """Main Streamlit app - simplified for debugging."""
-    st.set_page_config(page_title="Token Distribution Visualizer (Debug)", layout="wide")
+def get_entropy_color(entropy: float, min_entropy: float, max_entropy: float) -> str:
+    """Get color for a token based on its entropy.
     
-    st.title("Token Distribution Visualizer (Debug Mode)")
-    st.markdown("**Simplified version** - Shows first prompt-response pair only")
+    Higher entropy = darker color (more uncertainty)
+    
+    Args:
+        entropy: Token entropy value
+        min_entropy: Minimum entropy in the response
+        max_entropy: Maximum entropy in the response
+        
+    Returns:
+        Hex color string
+    """
+    if max_entropy == min_entropy:
+        # All tokens have same entropy
+        return "#808080"  # Medium gray
+    
+    # Normalize entropy to [0, 1]
+    normalized = (entropy - min_entropy) / (max_entropy - min_entropy)
+    
+    # Use grayscale: higher entropy = darker (lower RGB values)
+    # Scale from light gray (240) to black (0)
+    gray_value = int(240 - (normalized * 240))
+    gray_value = max(0, min(255, gray_value))
+    
+    return f"#{gray_value:02x}{gray_value:02x}{gray_value:02x}"
+
+
+def format_token_html(token: str, entropy: float, min_entropy: float, max_entropy: float) -> str:
+    """Format a token as HTML with entropy-based coloring.
+    
+    Args:
+        token: Token string
+        entropy: Token entropy
+        min_entropy: Minimum entropy in response
+        max_entropy: Maximum entropy in response
+        
+    Returns:
+        HTML string for the token
+    """
+    color = get_entropy_color(entropy, min_entropy, max_entropy)
+    # Escape HTML special characters in token
+    token_escaped = token.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+    return f'<span style="background-color: {color}; color: white; padding: 2px 4px; margin: 1px; border-radius: 3px; display: inline-block;" title="Entropy: {entropy:.3f}">{token_escaped}</span>'
+
+
+def get_top_tokens(distribution: np.ndarray, top_k: int = 20) -> List[Tuple[int, float]]:
+    """Get top K tokens by probability from a distribution.
+    
+    Args:
+        distribution: Probability distribution array (vocab_size,)
+        top_k: Number of top tokens to return
+        
+    Returns:
+        List of (token_id, probability) tuples, sorted by probability descending
+    """
+    top_indices = np.argsort(distribution)[::-1][:top_k]
+    return [(int(idx), float(distribution[idx])) for idx in top_indices]
+
+
+def main():
+    """Main Streamlit app."""
+    st.set_page_config(page_title="Token Distribution Visualizer", layout="wide")
+    
+    st.title("Token Distribution Visualizer")
+    st.markdown("Visualize token-wise distributions and entropy from 01-dist.py results")
+    
+    # Sidebar for configuration
+    st.sidebar.header("Configuration")
     
     # Get results directory
     default_results_dir = project_root / "exp" / "01-dist" / "output"
@@ -96,29 +143,21 @@ def main():
     )
     results_dir = Path(results_dir_str)
     
+    # Load data
     if not results_dir.exists():
-        st.error(f"❌ Results directory not found: {results_dir}")
+        st.error(f"Results directory not found: {results_dir}")
         st.stop()
     
-    # Load data with progress indicators
     try:
-        json_file = results_dir / "distributions.json"
-        if not json_file.exists():
-            st.error(f"❌ JSON file not found: {json_file}")
-            st.stop()
-        
-        st.write("=" * 60)
-        st.write("## Loading Data")
-        st.write("=" * 60)
-        
-        data = load_distributions(str(json_file))
-        
-        st.write("=" * 60)
-        st.write("## Data Loaded Successfully!")
-        st.write("=" * 60)
-        
+        with st.spinner("Loading metadata..."):
+            json_file = results_dir / "distributions.json"
+            if not json_file.exists():
+                st.error(f"JSON file not found: {json_file}")
+                st.stop()
+            
+            data = load_distributions(str(json_file))
     except Exception as e:
-        st.error(f"❌ Error loading data: {e}")
+        st.error(f"Error loading data: {e}")
         import traceback
         with st.expander("Error Details"):
             st.code(traceback.format_exc())
@@ -126,117 +165,161 @@ def main():
     
     results = data.get("results", [])
     if not results:
-        st.warning("⚠️ No results found in data file")
+        st.warning("No results found in data file")
         st.stop()
     
-    st.write(f"📋 Total examples in file: {len(results)}")
-    st.write("---")
+    # Get distributions file path
+    distributions_file = Path(data.get("_distributions_file", results_dir / "distributions.npz"))
     
-    # Get first example
-    first_example = results[0]
-    st.write("## First Example")
+    # Example selection
+    st.sidebar.header("Select Example")
+    example_options = [f"Example {r['example_id']}" for r in results]
+    selected_example_idx = st.sidebar.selectbox(
+        "Choose an example",
+        range(len(example_options)),
+        format_func=lambda i: example_options[i],
+        key="example_selector"
+    )
     
-    # Get first valid sample
-    samples = first_example.get("samples", [])
+    selected_example = results[selected_example_idx]
+    
+    # Sample selection
+    samples = selected_example.get("samples", [])
+    if not samples:
+        st.warning("No samples found for this example")
+        st.stop()
+    
+    # Filter out samples with errors
     valid_samples = [s for s in samples if "error" not in s]
-    
     if not valid_samples:
-        st.warning("⚠️ No valid samples found in first example")
+        st.warning("No valid samples found for this example")
         st.stop()
     
-    first_sample = valid_samples[0]
+    st.sidebar.header("Select Sample")
+    sample_options = [f"Sample {s['sample_id']}" for s in valid_samples]
+    selected_sample_idx = st.sidebar.selectbox(
+        "Choose a sample",
+        range(len(sample_options)),
+        format_func=lambda i: sample_options[i],
+        key="sample_selector"
+    )
     
-    # Load distribution for first sample on-demand
-    distributions_file = results_dir / data.get("distributions_file", "distributions.npz")
-    dist_index = first_sample.get("distribution_index")
+    selected_sample = valid_samples[selected_sample_idx]
     
+    # Load distribution for selected sample on-demand
+    dist_index = selected_sample.get("distribution_index")
     if dist_index is not None and distributions_file.exists():
-        st.write("---")
-        st.write("## Loading Distribution for First Sample")
-        st.write(f"📥 Loading distribution (index {dist_index})...")
         distribution = load_single_distribution(distributions_file, dist_index)
         if distribution is not None:
-            st.write(f"✅ Distribution loaded. Shape: {distribution.shape}")
-            st.write(f"  - Number of tokens: {distribution.shape[0]}")
-            st.write(f"  - Vocabulary size: {distribution.shape[1]}")
-            # Convert to list only for this one distribution
-            first_sample["distributions"] = distribution.tolist()
+            # Convert to list and store in sample
+            selected_sample["distributions"] = distribution.tolist()
+    
+    # Main content area
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.subheader("Prompt")
+        prompt = selected_example.get("prompt", "")
+        st.text_area("Prompt", prompt, height=200, disabled=True, label_visibility="collapsed")
+        
+        st.subheader("Response")
+        response = selected_sample.get("response", "")
+        token_strings = selected_sample.get("token_strings", [])
+        per_token_entropy = selected_sample.get("per_token_entropy", [])
+        
+        if not token_strings or not per_token_entropy:
+            st.text_area("Response", response, height=300, disabled=True, label_visibility="collapsed")
         else:
-            st.warning("⚠️ Could not load distribution")
-    elif dist_index is None:
-        st.info("ℹ️ No distribution index found for first sample")
-    elif not distributions_file.exists():
-        st.warning(f"⚠️ NPZ file not found: {distributions_file}")
+            # Calculate min/max entropy for coloring
+            if per_token_entropy:
+                min_entropy = min(per_token_entropy)
+                max_entropy = max(per_token_entropy)
+            else:
+                min_entropy = max_entropy = 0.0
+            
+            # Create HTML with colored tokens
+            token_html_parts = []
+            for i, (token, entropy) in enumerate(zip(token_strings, per_token_entropy)):
+                token_html = format_token_html(token, entropy, min_entropy, max_entropy)
+                token_html_parts.append(token_html)
+            
+            token_html = " ".join(token_html_parts)
+            
+            # Display with HTML
+            st.markdown(f'<div style="line-height: 2; word-wrap: break-word; padding: 10px; background-color: #f0f0f0; border-radius: 5px;">{token_html}</div>', unsafe_allow_html=True)
+            
+            # Entropy legend
+            st.caption(f"Entropy range: {min_entropy:.3f} (light gray) to {max_entropy:.3f} (dark gray/black)")
     
-    st.write("---")
-    
-    # Display prompt
-    st.write("### Prompt")
-    prompt = first_example.get("prompt", "")
-    st.text_area("", prompt, height=150, disabled=True, key="prompt_display")
-    
-    # Display response
-    st.write("### Response")
-    response = first_sample.get("response", "")
-    st.text_area("", response, height=200, disabled=True, key="response_display")
-    
-    # Display token information
-    token_strings = first_sample.get("token_strings", [])
-    per_token_entropy = first_sample.get("per_token_entropy", [])
-    token_ids = first_sample.get("token_ids", [])
-    
-    if token_strings and per_token_entropy:
-        st.write("### Token Information")
-        st.write(f"**Number of tokens:** {len(token_strings)}")
+    with col2:
+        st.subheader("Token Distribution")
         
-        # Show first 10 tokens
-        st.write("**First 10 tokens:**")
-        for i, (token, entropy, token_id) in enumerate(zip(
-            token_strings[:10], 
-            per_token_entropy[:10], 
-            token_ids[:10]
-        )):
-            st.write(f"  Token {i}: `{token}` | ID: {token_id} | Entropy: {entropy:.4f}")
-        
-        # Entropy stats
-        if per_token_entropy:
-            st.write("**Entropy Statistics:**")
-            st.write(f"  Min: {min(per_token_entropy):.4f}")
-            st.write(f"  Max: {max(per_token_entropy):.4f}")
-            st.write(f"  Mean: {np.mean(per_token_entropy):.4f}")
-            st.write(f"  Std: {np.std(per_token_entropy):.4f}")
-    else:
-        st.warning("⚠️ No token information available")
+        # Token selection
+        if token_strings:
+            # Create token options with entropy info
+            token_options = []
+            for i, token in enumerate(token_strings):
+                entropy_val = per_token_entropy[i] if i < len(per_token_entropy) else 0.0
+                token_display = token[:40] + "..." if len(token) > 40 else token
+                token_options.append(f"Token {i}: {token_display} (entropy: {entropy_val:.3f})")
+            
+            selected_token_idx = st.selectbox(
+                "Select a token to view its distribution",
+                range(len(token_strings)),
+                format_func=lambda i: token_options[i],
+                key="token_selector"
+            )
+            
+            # Get distribution for selected token
+            distributions = selected_sample.get("distributions")
+            if distributions:
+                # Convert to numpy array if it's a list
+                if isinstance(distributions, list):
+                    distributions = np.array(distributions)
+                
+                if selected_token_idx < len(distributions):
+                    token_dist = distributions[selected_token_idx]
+                    
+                    # Get top tokens
+                    top_k = st.slider("Number of top tokens to show", 10, 50, 20)
+                    top_tokens = get_top_tokens(token_dist, top_k=top_k)
+                    
+                    # Create bar chart
+                    probs = [t[1] for t in top_tokens]
+                    
+                    # Display chart
+                    chart_data = {"Probability": probs}
+                    st.bar_chart(chart_data)
+                    
+                    # Show details
+                    st.write(f"**Selected token:** `{token_strings[selected_token_idx]}`")
+                    st.write(f"**Token ID:** {selected_sample.get('token_ids', [])[selected_token_idx] if selected_token_idx < len(selected_sample.get('token_ids', [])) else 'N/A'}")
+                    st.write(f"**Entropy:** {per_token_entropy[selected_token_idx]:.4f}")
+                    
+                    # Show top tokens table
+                    with st.expander("Top tokens (expand to see details)"):
+                        for token_id, prob in top_tokens:
+                            st.write(f"Token ID {token_id}: {prob:.6f}")
+            else:
+                st.warning("Distribution data not available. Loading...")
+                # Try to load if we have the index
+                if dist_index is not None and distributions_file.exists():
+                    with st.spinner("Loading distribution..."):
+                        distribution = load_single_distribution(distributions_file, dist_index)
+                        if distribution is not None:
+                            selected_sample["distributions"] = distribution.tolist()
+                            st.rerun()
+        else:
+            st.info("No token information available")
     
-    # Check if distributions are loaded
-    distributions = first_sample.get("distributions")
-    if distributions:
-        st.write("### Distribution Information")
-        if isinstance(distributions, list):
-            distributions = np.array(distributions)
-        st.write(f"**Distribution shape:** {distributions.shape}")
-        st.write(f"  - Number of tokens: {distributions.shape[0]}")
-        st.write(f"  - Vocabulary size: {distributions.shape[1]}")
-        
-        # Show distribution for first token
-        if len(distributions) > 0:
-            st.write("**First token distribution (top 10):**")
-            first_token_dist = distributions[0]
-            top_indices = np.argsort(first_token_dist)[::-1][:10]
-            for idx in top_indices:
-                st.write(f"  Token ID {idx}: {first_token_dist[idx]:.6f}")
-    else:
-        st.warning("⚠️ Distribution data not loaded")
-    
-    # Raw data view
-    with st.expander("🔍 View Raw Sample Data"):
-        st.json({
-            "example_id": first_example.get("example_id"),
-            "sample_id": first_sample.get("sample_id"),
-            "has_distributions": "distributions" in first_sample,
-            "num_tokens": len(token_strings) if token_strings else 0,
-            "has_entropy": len(per_token_entropy) > 0
-        })
+    # Statistics
+    st.sidebar.header("Statistics")
+    st.sidebar.write(f"**Total examples:** {len(results)}")
+    st.sidebar.write(f"**Samples in this example:** {len(valid_samples)}")
+    if per_token_entropy:
+        st.sidebar.write(f"**Average entropy:** {np.mean(per_token_entropy):.3f}")
+        st.sidebar.write(f"**Min entropy:** {min(per_token_entropy):.3f}")
+        st.sidebar.write(f"**Max entropy:** {max(per_token_entropy):.3f}")
 
 
 if __name__ == "__main__":
