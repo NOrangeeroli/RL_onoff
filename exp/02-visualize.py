@@ -21,7 +21,7 @@ def load_distributions(
     json_file: Union[str, Path],
     distributions_file: Optional[Union[str, Path]] = None
 ) -> Dict:
-    """Load distributions from JSON metadata and NPZ distributions file."""
+    """Load distributions from JSON metadata (skip NPZ loading for performance)."""
     json_path = Path(json_file)
     if not json_path.exists():
         raise FileNotFoundError(f"JSON file not found: {json_path}")
@@ -43,34 +43,41 @@ def load_distributions(
         st.warning(f"⚠️ NPZ file not found: {distributions_file}")
         return data
     
-    st.write(f"📦 Loading NPZ file: {distributions_file}")
+    st.write(f"📦 NPZ file found: {distributions_file}")
     st.write(f"📊 File size: {distributions_file.stat().st_size / 1e9:.2f} GB")
+    st.write("⏭️ Skipping bulk distribution loading (will load on-demand)")
     
-    # Load distributions from NPZ
-    distributions_data = np.load(distributions_file)
-    st.write(f"✅ NPZ loaded. Found {len(distributions_data.files)} distributions.")
+    # SKIP loading all distributions - this is the bottleneck!
+    # Converting 6.30 GB to Python lists takes forever and uses too much memory
+    # We'll load distributions on-demand when needed
     
-    # Reconstruct full structure by adding distributions to each sample
-    results = data.get("results", [])
-    st.write(f"🔄 Processing {len(results)} examples...")
-    
-    processed_count = 0
-    for example_result in results:
-        for sample in example_result.get("samples", []):
-            if "error" in sample:
-                continue
-            
-            dist_index = sample.get("distribution_index")
-            if dist_index is not None:
-                dist_key = f"dist_{dist_index}"
-                if dist_key in distributions_data:
-                    sample["distributions"] = distributions_data[dist_key].tolist()
-                    processed_count += 1
-                    if processed_count % 10 == 0:
-                        st.write(f"  Processed {processed_count} distributions...")
-    
-    st.write(f"✅ Done! Processed {processed_count} distributions.")
     return data
+
+
+@st.cache_data
+def load_single_distribution(distributions_file: Path, dist_index: int) -> Optional[np.ndarray]:
+    """Load a single distribution from NPZ file on-demand.
+    
+    Args:
+        distributions_file: Path to the NPZ file
+        dist_index: Index of the distribution to load
+        
+    Returns:
+        Distribution array or None if not found
+    """
+    try:
+        distributions_data = np.load(distributions_file)
+        dist_key = f"dist_{dist_index}"
+        if dist_key in distributions_data:
+            return distributions_data[dist_key]
+        else:
+            st.warning(f"Distribution index {dist_index} not found in NPZ file")
+    except Exception as e:
+        st.error(f"Error loading distribution {dist_index}: {e}")
+        import traceback
+        with st.expander("Error Details"):
+            st.code(traceback.format_exc())
+    return None
 
 
 def main():
@@ -138,6 +145,30 @@ def main():
         st.stop()
     
     first_sample = valid_samples[0]
+    
+    # Load distribution for first sample on-demand
+    distributions_file = results_dir / data.get("distributions_file", "distributions.npz")
+    dist_index = first_sample.get("distribution_index")
+    
+    if dist_index is not None and distributions_file.exists():
+        st.write("---")
+        st.write("## Loading Distribution for First Sample")
+        st.write(f"📥 Loading distribution (index {dist_index})...")
+        distribution = load_single_distribution(distributions_file, dist_index)
+        if distribution is not None:
+            st.write(f"✅ Distribution loaded. Shape: {distribution.shape}")
+            st.write(f"  - Number of tokens: {distribution.shape[0]}")
+            st.write(f"  - Vocabulary size: {distribution.shape[1]}")
+            # Convert to list only for this one distribution
+            first_sample["distributions"] = distribution.tolist()
+        else:
+            st.warning("⚠️ Could not load distribution")
+    elif dist_index is None:
+        st.info("ℹ️ No distribution index found for first sample")
+    elif not distributions_file.exists():
+        st.warning(f"⚠️ NPZ file not found: {distributions_file}")
+    
+    st.write("---")
     
     # Display prompt
     st.write("### Prompt")
