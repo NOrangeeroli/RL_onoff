@@ -1,0 +1,21 @@
+# Configuration for 01-dist.py experiment
+
+# Input configuration (results from 00-sample.py)
+input:
+  results_file: "exp/00-sample/output/results.json"  # Path to results from 00-sample.py
+
+# Backend configuration (should match the one used in 00-sample.py)
+backend:
+  backend_type: "huggingface"
+  model_name: "meta-llama/Llama-3.2-3B"
+  # Additional backend config can be added here if needed
+
+# Distribution extraction configuration
+distribution:
+  use_logits: false  # If true, extract logits; if false, extract probabilities
+  temperature: 1.0  # Temperature for probability normalization
+
+# Output configuration
+output:
+  dir: "exp/01-dist/output"  # Output directory (relative to project root)
+
