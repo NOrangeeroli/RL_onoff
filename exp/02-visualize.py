@@ -374,13 +374,33 @@ def main():
                             "Probability": probs
                         })
                         # Sort by probability descending to ensure bars are ordered
-                        chart_df = chart_df.sort_values("Probability", ascending=False)
-                        chart_df = chart_df.set_index("Token")
-                        st.bar_chart(chart_df)
+                        chart_df = chart_df.sort_values("Probability", ascending=False).reset_index(drop=True)
+                        
+                        # Try to use plotly for better control over ordering
+                        try:
+                            import plotly.express as px
+                            fig = px.bar(
+                                chart_df,
+                                x="Token",
+                                y="Probability",
+                                title=f"Token Distribution (Token {selected_token_idx})",
+                                labels={"Token": "Token", "Probability": "Probability"}
+                            )
+                            # Sort bars by probability (descending)
+                            fig.update_layout(
+                                xaxis={'categoryorder': 'total descending'},
+                                xaxis_tickangle=-45
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+                        except ImportError:
+                            # Fallback to streamlit bar_chart
+                            # Create a dict with sorted data to preserve order
+                            chart_dict = {row["Token"]: row["Probability"] for _, row in chart_df.iterrows()}
+                            st.bar_chart(chart_dict)
                     except ImportError:
                         # Fallback if pandas not available - create dict sorted by value
                         sorted_data = sorted(zip(token_labels, probs), key=lambda x: x[1], reverse=True)
-                        chart_data = {"Probability": [p for _, p in sorted_data]}
+                        chart_data = {label: prob for label, prob in sorted_data}
                         st.bar_chart(chart_data)
                         st.caption("Token labels: " + ", ".join([l for l, _ in sorted_data[:5]]) + "...")
                     
