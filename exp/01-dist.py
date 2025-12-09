@@ -73,7 +73,12 @@ def get_tokenized_strings(backend, text: str) -> List[str]:
         else:
             # Fallback: decode single token
             token_str = tokenizer.decode([token_id], skip_special_tokens=True)
-        token_strings.append(str(token_str))
+        token_str = str(token_str)
+        
+        # Replace 'Ġ' (special space character) and regular spaces
+        token_str = token_str.replace('Ġ', '').replace(' ', '')
+        
+        token_strings.append(token_str)
     
     return token_strings
 
