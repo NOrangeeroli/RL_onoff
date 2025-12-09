@@ -23,15 +23,13 @@ class Sampler:
     def sample(
         self,
         prompts: List[str],
-        config: Optional[SamplingConfig] = None,
-        batch_size: Optional[int] = None
+        config: Optional[SamplingConfig] = None
     ) -> List[Union[str, List[str]]]:
         """Sample text from multiple prompts in batches.
         
         Args:
             prompts: List of prompts
-            config: Sampling configuration
-            batch_size: Batch size for processing (None for all at once)
+            config: Sampling configuration (includes batch_size and num_samples)
             
         Returns:
             List of generated texts (or list of lists if num_samples > 1)
@@ -41,14 +39,17 @@ class Sampler:
 
         # Prepare generation kwargs
         gen_kwargs = {
-            "max_new_tokens": config.max_new_tokens,
+            "max_length": config.max_length,
             "temperature": config.temperature,
             "top_k": config.top_k,
             "top_p": config.top_p,
             "do_sample": config.do_sample,
         }
+        if config.stop_strings is not None:
+            gen_kwargs["stop_strings"] = config.stop_strings
 
         all_results = []
+        batch_size = config.batch_size
 
         if batch_size is None:
             # Process all prompts at once in a single batch
@@ -118,7 +119,7 @@ if __name__ == "__main__":
         print("Example 1: Basic single prompt sampling")
         print("=" * 60)
         prompt = "The future of artificial intelligence is"
-        result = sampler.sample(prompt, config=SamplingConfig(max_new_tokens=20))
+        result = sampler.sample(prompt, config=SamplingConfig(max_length=20))
         print(f"Prompt: {prompt}")
         print(f"Generated: {result}\n")
         
@@ -130,7 +131,7 @@ if __name__ == "__main__":
             "Python is a programming language that",
             "Machine learning is"
         ]
-        results = sampler.sample(prompts, config=SamplingConfig(max_new_tokens=15))
+        results = sampler.sample(prompts, config=SamplingConfig(max_length=15))
         for prompt, result in zip(prompts, results):
             print(f"Prompt: {prompt}")
             print(f"Generated: {result}\n")
@@ -140,7 +141,7 @@ if __name__ == "__main__":
         print("Example 3: Custom SamplingConfig (temperature, top_k, top_p)")
         print("=" * 60)
         config = SamplingConfig(
-            max_new_tokens=20,
+            max_length=20,
             temperature=0.7,
             top_k=50,
             top_p=0.9,
@@ -154,7 +155,7 @@ if __name__ == "__main__":
         print("=" * 60)
         print("Example 4: Multiple samples per prompt")
         print("=" * 60)
-        config = SamplingConfig(max_new_tokens=15, num_samples=3)
+        config = SamplingConfig(max_length=15, num_samples=3)
         results = sampler.sample(["Once upon a time"], config=config)
         print(f"Prompt: Once upon a time")
         print(f"Generated {config.num_samples} samples:")
@@ -166,7 +167,7 @@ if __name__ == "__main__":
         print("=" * 60)
         print("Example 5: Deterministic sampling (do_sample=False)")
         print("=" * 60)
-        config = SamplingConfig(max_new_tokens=15, do_sample=False)
+        config = SamplingConfig(max_length=15, do_sample=False)
         result = sampler.sample(["The answer to life, the universe, and everything is"], config=config)
         print(f"Prompt: The answer to life, the universe, and everything is")
         print(f"Generated (deterministic): {result[0]}\n")

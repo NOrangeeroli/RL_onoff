@@ -21,7 +21,7 @@ from rl_onoff.utils.data_loader import load_data
 @click.option('--output', required=True, help='Path to output JSON file')
 @click.option('--question-column', default=None, help='Name of question column in dataset')
 @click.option('--reference-column', default=None, help='Name of reference column in dataset')
-@click.option('--max-new-tokens', default=100, type=int, help='Maximum tokens to generate')
+@click.option('--max-length', default=100, type=int, help='Maximum length for generation')
 @click.option('--temperature', default=1.0, type=float, help='Sampling temperature')
 @click.option('--top-k', default=None, type=int, help='Top-k sampling parameter')
 @click.option('--top-p', default=None, type=float, help='Top-p sampling parameter')
@@ -35,7 +35,7 @@ def main(
     output: str,
     question_column: str,
     reference_column: str,
-    max_new_tokens: int,
+    max_length: int,
     temperature: float,
     top_k: int,
     top_p: float,
@@ -63,11 +63,12 @@ def main(
     # Initialize sampler
     sampler = Sampler(backend)
     sampling_config = SamplingConfig(
-        max_new_tokens=max_new_tokens,
+        max_length=max_length,
         temperature=temperature,
         top_k=top_k,
         top_p=top_p,
         num_samples=num_samples,
+        batch_size=batch_size,
     )
     
     # Determine which rewards to compute
@@ -93,14 +94,7 @@ def main(
     
     # Generate samples
     click.echo("Generating samples...")
-    if batch_size:
-        predictions = sampler.sample_batch(
-            questions,
-            config=sampling_config,
-            batch_size=batch_size,
-        )
-    else:
-        predictions = sampler.sample(questions, config=sampling_config)
+    predictions = sampler.sample(questions, config=sampling_config)
     
     # Handle multiple samples
     if num_samples > 1:

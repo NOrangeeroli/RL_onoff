@@ -23,7 +23,7 @@ class MockBackend(BaseBackend):
         self.tokenizer = "mock_tokenizer"
         self._is_loaded = True
     
-    def _generate_impl(self, prompts, max_new_tokens=100, temperature=1.0, 
+    def _generate_impl(self, prompts, max_length=100, temperature=1.0, 
                       top_k=None, top_p=None, do_sample=True, **kwargs):
         """Mock generate implementation."""
         if isinstance(prompts, str):
@@ -46,7 +46,7 @@ class TestSamplingConfig:
     def test_default_config(self):
         """Test default SamplingConfig values."""
         config = SamplingConfig()
-        assert config.max_new_tokens == 100
+        assert config.max_length == 100
         assert config.temperature == 1.0
         assert config.top_k is None
         assert config.top_p is None
@@ -176,7 +176,8 @@ class TestSampler:
         sampler = Sampler(backend)
         
         prompts = ["prompt1", "prompt2", "prompt3", "prompt4"]
-        results = sampler.sample(prompts, batch_size=2)
+        config = SamplingConfig(batch_size=2)
+        results = sampler.sample(prompts, config=config)
         
         assert isinstance(results, list)
         assert len(results) == 4
@@ -192,9 +193,9 @@ class TestSampler:
         backend = MockBackend()
         sampler = Sampler(backend)
         
-        config = SamplingConfig(num_samples=2)
+        config = SamplingConfig(num_samples=2, batch_size=2)
         prompts = ["prompt1", "prompt2", "prompt3"]
-        results = sampler.sample(prompts, config=config, batch_size=2)
+        results = sampler.sample(prompts, config=config)
         
         assert isinstance(results, list)
         assert len(results) == 3
@@ -210,12 +211,12 @@ class TestSampler:
         sampler = Sampler(backend)
         
         prompts = ["test prompt"]
-        config = SamplingConfig(max_new_tokens=10, temperature=0.8)
+        config = SamplingConfig(max_length=10, temperature=0.8)
         results = sampler.sample(prompts, config=config)
         
         # Verify config parameters were passed
         call_kwargs = backend.generate.call_args[1]
-        assert call_kwargs["max_new_tokens"] == 10
+        assert call_kwargs["max_length"] == 10
         assert call_kwargs["temperature"] == 0.8
     
     def test_sample_empty_prompts_list(self):

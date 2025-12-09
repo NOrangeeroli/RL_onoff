@@ -29,7 +29,7 @@ def main(
     model_name: str = "gpt2",
     question_column: Optional[str] = None,
     reference_column: Optional[str] = None,
-    max_new_tokens: int = 256,
+    max_length: int = 256,
     temperature: float = 1.0,
     top_k: Optional[int] = None,
     top_p: Optional[float] = None,
@@ -46,7 +46,7 @@ def main(
         model_name: Model name or path
         question_column: Name of question column in dataset
         reference_column: Name of reference column in dataset
-        max_new_tokens: Maximum tokens to generate
+        max_length: Maximum length for generation
         temperature: Sampling temperature
         top_k: Top-k sampling parameter
         top_p: Top-p sampling parameter
@@ -97,11 +97,12 @@ def main(
     # Initialize sampler
     sampler = Sampler(backend)
     sampling_config = SamplingConfig(
-        max_new_tokens=max_new_tokens,
+        max_length=max_length,
         temperature=temperature,
         top_k=top_k,
         top_p=top_p,
         num_samples=num_samples,
+        batch_size=batch_size,
     )
     
     # Format queries using task
@@ -113,14 +114,7 @@ def main(
     
     # Sample responses
     print("\nSampling responses...")
-    if batch_size:
-        responses = sampler.sample_batch(
-            prompts,
-            config=sampling_config,
-            batch_size=batch_size,
-        )
-    else:
-        responses = sampler.sample(prompts, config=sampling_config)
+    responses = sampler.sample(prompts, config=sampling_config)
     
     # Handle multiple samples per prompt
     if num_samples > 1:
@@ -170,11 +164,12 @@ def main(
         'model': model_name,
         'backend': backend_type,
         'sampling_config': {
-            'max_new_tokens': max_new_tokens,
+            'max_length': max_length,
             'temperature': temperature,
             'top_k': top_k,
             'top_p': top_p,
             'num_samples': num_samples,
+            'batch_size': batch_size,
         },
         'num_examples': len(questions),
         'results': all_results,
@@ -212,7 +207,7 @@ if __name__ == "__main__":
     parser.add_argument("--model-name", default="gpt2", help="Model name or path")
     parser.add_argument("--question-column", default=None, help="Name of question column in dataset")
     parser.add_argument("--reference-column", default=None, help="Name of reference column in dataset")
-    parser.add_argument("--max-new-tokens", type=int, default=256, help="Maximum tokens to generate")
+    parser.add_argument("--max-length", type=int, default=256, help="Maximum length for generation")
     parser.add_argument("--temperature", type=float, default=1.0, help="Sampling temperature")
     parser.add_argument("--top-k", type=int, default=None, help="Top-k sampling parameter")
     parser.add_argument("--top-p", type=float, default=None, help="Top-p sampling parameter")
@@ -229,7 +224,7 @@ if __name__ == "__main__":
         model_name=args.model_name,
         question_column=args.question_column,
         reference_column=args.reference_column,
-        max_new_tokens=args.max_new_tokens,
+        max_length=args.max_length,
         temperature=args.temperature,
         top_k=args.top_k,
         top_p=args.top_p,

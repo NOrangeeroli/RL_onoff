@@ -29,7 +29,7 @@ prompt = math_task.format_prompt(question)
 backend = get_backend("huggingface", model_name="gpt2")
 backend.load()
 sampler = Sampler(backend)
-response = sampler.sample([prompt], config=SamplingConfig(max_new_tokens=50))[0]
+response = sampler.sample([prompt], config=SamplingConfig(max_length=50))[0]
 
 # Evaluate response
 reference = "4"

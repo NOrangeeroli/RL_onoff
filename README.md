@@ -99,7 +99,7 @@ from rl_onoff.tasks.rewards.builtin import BLEUReward, ROUGEReward
 # Initialize sampler
 sampler = Sampler(backend)
 config = SamplingConfig(
-    max_new_tokens=100,
+    max_length=100,
     temperature=0.7,
     top_p=0.9,
 )
