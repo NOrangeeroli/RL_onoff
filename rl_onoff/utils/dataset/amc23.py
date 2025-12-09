@@ -21,6 +21,11 @@ class AMC23Dataset(BaseDataset):
     def extract_question(self, entry: Dict) -> str:
         """Extract question from entry."""
         prompt = entry.get("prompt", {})
+        
+        # Handle case where prompt is a list of length 1 containing a dict
+        if isinstance(prompt, list) and len(prompt) > 0:
+            prompt = prompt[0]
+        
         if isinstance(prompt, dict):
             content = prompt.get("content", "")
             # Ensure it's a string
