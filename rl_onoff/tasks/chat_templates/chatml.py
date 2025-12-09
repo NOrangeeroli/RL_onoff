@@ -19,7 +19,6 @@ class ChatMLTemplate(BaseChatTemplate):
     def format(
         self,
         messages: List[Dict[str, str]],
-        add_generation_prompt: bool = False,
         **kwargs
     ) -> str:
         """Format messages in ChatML style.
@@ -33,12 +32,16 @@ class ChatMLTemplate(BaseChatTemplate):
             Formatted prompt string with ChatML tags
         """
         parts = []
-        
+        add_generation_prompt = True
         for msg in messages:
             role = msg.get("role", "user")
             content = msg.get("content", "")
             
-            parts.append(f"<|im_start|>{role}\n{content}<|im_end|>")
+            if role == "assistant_generation" and content:
+                parts.append(f"<|im_start|>assistant\n{content}")
+                add_generation_prompt = False
+            else:
+                parts.append(f"<|im_start|>{role}\n{content}<|im_end|>")
         
         if add_generation_prompt:
             parts.append("<|im_start|>assistant\n")

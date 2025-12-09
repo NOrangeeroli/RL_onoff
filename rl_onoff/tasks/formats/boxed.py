@@ -23,8 +23,27 @@ class BoxedFormat(BaseFormat):
         Returns:
             System prompt string
         """
-        return """You are a helpful math tutor. Solve the problem step by step and provide the final answer in a boxed format. At the end of your solution, include the final answer as \\boxed{answer}."""
-
+        return """You are a helpful assistant."""
+    
+    def apply_user_prompt_template(self, question: str) -> str:
+        """Apply the user prompt template to a question.
+        
+        Args:
+            question: The question/problem string
+            
+        Returns:
+            The formatted question string
+        """
+        return f"""{input}\nPlease reason step by step, and put your final answer within \\boxed{}."""
+    
+    def get_assistant_prompt(self) -> str:
+        """Get the assistant prompt for boxed format.
+        
+        Returns:
+            Assistant prompt string
+        """
+        return None
+    
     def extract(self, response: str) -> Dict[str, Optional[str]]:
         """Extract reasoning and answer from a response with boxed format.
         

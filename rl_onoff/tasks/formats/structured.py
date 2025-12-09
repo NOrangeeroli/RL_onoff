@@ -23,15 +23,28 @@ class StructuredFormat(BaseFormat):
         Returns:
             System prompt string
         """
-        return """You are a helpful math tutor. Solve the problem step by step and format your response using the following structure:
-<think>
-[Your step-by-step reasoning and solution process goes here]
-</think>
-<answer>
-[The final numerical or symbolic answer goes here]
-</answer>
-Make sure to include both tags with your reasoning and answer."""
+        return """You are a helpful assistant. Before solving any problem, you must start by reflecting on your metacognitive strategy in the <think> section. In <think>, do not solve the problem yet. Instead, analyze what type of problem it is and what concept it tests, what key information and constraints are given, what general class of problems it belongs to and why, what reasoning method is most appropriate (e.g., algebraic, combinatorial, case analysis), and what common pitfalls to avoid. Finally, summarize a general, reusable approach or solution template that can be applied to this type of problem. After that, in the <answer> section, solve the problem step-by-step, clearly showing all work, and conclude with your final answer in \\boxed{}."""
 
+    def apply_user_prompt_template(self, question: str) -> str:
+        """Apply the user prompt template to a question.
+        
+        Args:
+            question: The question/problem string
+            
+        Returns:
+            The formatted question string
+        """
+        return f"""{question}\nYour output must strictly follow this format:\n<think> high-level metacognitive reasoning, problem type classification, and generalized solving strategy here </think>\n<answer> detailed step-by-step solution here, ending with \\boxed{final result} </answer>"""
+
+
+    def get_assistant_prompt(self) -> str:
+        """Get the assistant prompt for structured format.
+        
+        Returns:
+            Assistant prompt string
+        """
+        return """<think>"""
+    
     def extract(self, response: str) -> Dict[str, Optional[str]]:
         """Extract reasoning and answer from a response with structured format.
         

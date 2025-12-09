@@ -8,8 +8,8 @@ from rl_onoff.tasks.chat_templates.base import BaseChatTemplate
 class LlamaChatTemplate(BaseChatTemplate):
     """Llama-style chat template.
     
-    Uses special tokens: <s>, </s>, [INST], [/INST]
-    Format: <s>[INST] user_message [/INST] assistant_message </s>
+    Uses special tokens: <|begin_of_text|>, <|start_header_id|>, <|end_header_id|>, <|eot_id|>
+    Format: <|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{content}<|eot_id|>...
     """
 
     def __init__(self):
@@ -18,47 +18,41 @@ class LlamaChatTemplate(BaseChatTemplate):
 
     def format(
         self,
-        messages: List[Dict[str, str]],
-        add_generation_prompt: bool = False,
-        **kwargs
+        messages: List[Dict[str, str]],        **kwargs
     ) -> str:
         """Format messages in Llama style.
         
         Args:
             messages: List of message dicts with 'role' and 'content'
-            add_generation_prompt: If True, add [INST] prompt at the end
+            add_generation_prompt: If True, add assistant prompt at the end
             **kwargs: Additional formatting options
             
         Returns:
             Formatted prompt string with Llama tokens
         """
         parts = []
+        has_system = False
+        add_generation_prompt = True
         
-        # Start with <s> token
-        parts.append("<s>")
-        
-        for i, msg in enumerate(messages):
+        for msg in messages:
             role = msg.get("role", "user")
             content = msg.get("content", "")
-            
             if role == "system":
-                # System message at the beginning
-                if i == 0:
-                    parts.append(f"[INST] <<SYS>>\n{content}\n<</SYS>>\n\n")
-                else:
-                    parts.append(f"[INST] {content} [/INST]")
+                parts.append(f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{content}<|eot_id|>")
+                has_system = True
             elif role == "user":
-                if i == 0 and not any(m.get("role") == "system" for m in messages):
-                    parts.append(f"[INST] {content} [/INST]")
-                else:
-                    parts.append(f"[INST] {content} [/INST]")
+                if not has_system:
+                    # Add begin_of_text if no system message
+                    parts.append("<|begin_of_text|>")
+                parts.append(f"<|start_header_id|>user<|end_header_id|>\n\n{content}<|eot_id|>")
             elif role == "assistant":
-                parts.append(f"{content} </s>")
+                parts.append(f"<|start_header_id|>assistant<|end_header_id|>\n\n{content}<|eot_id|>")
+            elif role == "assistant_generation" and content:
+                add_generation_prompt = False
+                parts.append(f"<|start_header_id|>assistant<|end_header_id|>\n\n{content}")
         
         if add_generation_prompt:
-            # If last message is not assistant, add prompt for assistant response
-            if not messages or messages[-1].get("role") != "assistant":
-                parts.append("<s> [INST]")
+            parts.append("<|start_header_id|>assistant<|end_header_id|>\n\n")
         
-        return " ".join(parts)
+        return "".join(parts)
 

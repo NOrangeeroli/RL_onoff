@@ -46,7 +46,29 @@ class BaseFormat(ABC):
             Values can be None if not found or not applicable.
         """
         pass
-
+    
+    @abstractmethod
+    def apply_user_prompt_template(self, question: str) -> str:
+        """Apply the user prompt template to a question.
+        
+        Args:
+            question: The question/problem string
+            
+        Returns:
+            The formatted question string
+        """
+        pass
+        
+    @abstractmethod
+    def get_assistant_prompt(self) -> str:
+        """Get the assistant prompt template.
+        
+        Returns:
+            The assistant prompt template string
+        """
+        pass
+    
+        
     def format_message(self, question: str) -> List[Dict[str, str]]:
         """Format a question into a list of message dicts for chat templates.
         
@@ -60,9 +82,12 @@ class BaseFormat(ABC):
         """
         messages = []
         system_prompt = self.get_system_prompt()
+        assistant_prompt = self.get_assistant_prompt()
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": question})
+        messages.append({"role": "user", "content": self.apply_user_prompt_template(question)})
+        if assistant_prompt:
+            messages.append({"role": "assistant_generation", "content": assistant_prompt})
         return messages
 
     def __repr__(self) -> str:

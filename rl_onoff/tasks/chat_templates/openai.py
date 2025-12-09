@@ -19,7 +19,6 @@ class OpenAIChatTemplate(BaseChatTemplate):
     def format(
         self,
         messages: List[Dict[str, str]],
-        add_generation_prompt: bool = False,
         **kwargs
     ) -> str:
         """Format messages in OpenAI style.
@@ -33,6 +32,7 @@ class OpenAIChatTemplate(BaseChatTemplate):
             Formatted prompt string
         """
         formatted_parts = []
+        add_generation_prompt = True
         
         for msg in messages:
             role = msg.get("role", "user")
@@ -42,8 +42,9 @@ class OpenAIChatTemplate(BaseChatTemplate):
                 formatted_parts.append(f"System: {content}")
             elif role == "user":
                 formatted_parts.append(f"User: {content}")
-            elif role == "assistant":
+            elif role == "assistant" or (role == "assistant_generation" and content):
                 formatted_parts.append(f"Assistant: {content}")
+                add_generation_prompt = False
         
         if add_generation_prompt:
             formatted_parts.append("Assistant:")
