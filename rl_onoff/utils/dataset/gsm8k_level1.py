@@ -1,0 +1,50 @@
+"""GSM8K Level 1 dataset."""
+
+from pathlib import Path
+from typing import Dict
+
+from rl_onoff.utils.dataset.base import BaseDataset
+
+
+class GSM8KLevel1Dataset(BaseDataset):
+    """GSM8K Level 1 dataset loader.
+    
+    Format:
+    - Question: extra_info.question or prompt.content
+    - Answer: reward_model.ground_truth (string) or extra_info.answer
+    """
+    
+    def get_file_path(self) -> Path:
+        """Get the path to the GSM8K Level 1 file."""
+        return self.data_dir / "data" / "gsm8k_level1" / f"{self.split}.parquet"
+    
+    def extract_question(self, entry: Dict) -> str:
+        """Extract question from entry."""
+        # Try extra_info.question first, then prompt.content
+        extra_info = entry.get("extra_info", {})
+        if isinstance(extra_info, dict):
+            question = extra_info.get("question")
+            if question:
+                return str(question)
+        
+        prompt = entry.get("prompt", {})
+        if isinstance(prompt, dict):
+            return prompt.get("content", "")
+        return str(prompt)
+    
+    def extract_answer(self, entry: Dict) -> str:
+        """Extract answer from entry."""
+        # Try extra_info.answer first, then reward_model.ground_truth
+        extra_info = entry.get("extra_info", {})
+        if isinstance(extra_info, dict):
+            answer = extra_info.get("answer")
+            if answer:
+                return str(answer)
+        
+        reward_model = entry.get("reward_model", {})
+        if isinstance(reward_model, dict):
+            ground_truth = reward_model.get("ground_truth")
+            if ground_truth:
+                return str(ground_truth)
+        return ""
+
