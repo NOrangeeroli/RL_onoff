@@ -4,7 +4,7 @@ top_k: null  # null = no top_k filtering
 top_p: null  # null = no top_p filtering
 do_sample: true
 num_samples: 8
-batch_size: 48  # null = process all prompts at once, or integer for batch size
+batch_size: 1024  # null = process all prompts at once, or integer for batch size
 seed: null  # null = random seed
 stop_strings: ['\n\n']  # null = no stop strings, or list of strings to stop generation
 
