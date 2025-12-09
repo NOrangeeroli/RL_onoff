@@ -1,0 +1,9 @@
+{
+  "backend_type": "sglang",
+  "model_name": "gpt2",
+  "tp_size": null,
+  "mem_fraction_static": null,
+  "context_length": null,
+  "backend_kwargs": {}
+}
+

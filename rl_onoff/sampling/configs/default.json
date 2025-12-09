@@ -1,0 +1,10 @@
+{
+  "max_new_tokens": 256,
+  "temperature": 1.0,
+  "top_k": null,
+  "top_p": null,
+  "do_sample": true,
+  "num_samples": 1,
+  "seed": null
+}
+

@@ -9,13 +9,7 @@ from tqdm import tqdm
 
 from rl_onoff.backends import get_backend
 from rl_onoff.sampling import Sampler, SamplingConfig
-from rl_onoff.tasks.rewards import RewardRegistry
-from rl_onoff.tasks.rewards.builtin import (
-    PerplexityReward,
-    BLEUReward,
-    ROUGEReward,
-    ExactMatchReward,
-)
+from rl_onoff.tasks.rewards import create_reward, REWARD_REGISTRY
 from rl_onoff.utils.data_loader import load_data
 
 
@@ -76,26 +70,26 @@ def main(
         num_samples=num_samples,
     )
     
-    # Initialize rewards
-    reward_registry = RewardRegistry()
-    
-    # Register built-in rewards
-    if backend_type == 'huggingface':
-        reward_registry.register(PerplexityReward(backend=backend))
-    
-    try:
-        reward_registry.register(BLEUReward())
-        reward_registry.register(ROUGEReward())
-    except ImportError as e:
-        click.echo(f"Warning: Some rewards unavailable: {e}")
-    
-    reward_registry.register(ExactMatchReward())
-    
     # Determine which rewards to compute
     if metrics.lower() == 'all':
-        reward_names = None
+        reward_names = list(REWARD_REGISTRY.keys())
+        # Remove perplexity if backend doesn't support it
+        if backend_type != 'huggingface' and 'perplexity' in reward_names:
+            reward_names.remove('perplexity')
     else:
         reward_names = [m.strip() for m in metrics.split(',')]
+    
+    # Create reward instances
+    rewards = {}
+    for reward_name in reward_names:
+        try:
+            if reward_name == 'perplexity' and backend_type == 'huggingface':
+                rewards[reward_name] = create_reward(reward_name, backend=backend)
+            else:
+                rewards[reward_name] = create_reward(reward_name)
+        except (ImportError, ValueError) as e:
+            click.echo(f"Warning: Reward '{reward_name}' unavailable: {e}")
+            continue
     
     # Generate samples
     click.echo("Generating samples...")
@@ -123,11 +117,12 @@ def main(
     
     # Calculate rewards
     click.echo("Calculating rewards...")
-    reward_results = reward_registry.compute_all(
-        flat_predictions,
-        flat_references,
-        reward_names=reward_names,
-    )
+    reward_results = {}
+    for reward_name, reward in rewards.items():
+        try:
+            reward_results[reward_name] = reward.compute(flat_predictions, flat_references)
+        except Exception as e:
+            reward_results[reward_name] = {"error": str(e)}
     
     # Prepare output
     output_data = {

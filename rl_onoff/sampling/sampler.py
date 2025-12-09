@@ -1,21 +1,9 @@
 """Sampling utilities for LLM generation."""
 
 from typing import List, Dict, Optional, Union, Any
-from dataclasses import dataclass
 
 from rl_onoff.backends.base import BaseBackend
-
-
-@dataclass
-class SamplingConfig:
-    """Configuration for sampling parameters."""
-    max_new_tokens: int = 100
-    temperature: float = 1.0
-    top_k: Optional[int] = None
-    top_p: Optional[float] = None
-    do_sample: bool = True
-    num_samples: int = 1
-    seed: Optional[int] = None
+from rl_onoff.sampling.config import SamplingConfig
 
 
 class Sampler:
