@@ -16,7 +16,6 @@ from rl_onoff.tasks.chat_templates import (
     OpenAIChatTemplate,
     LlamaChatTemplate,
     ChatMLTemplate,
-    SimpleChatTemplate,
 )
 
 
@@ -55,6 +54,5 @@ __all__ = [
     "OpenAIChatTemplate",
     "LlamaChatTemplate",
     "ChatMLTemplate",
-    "SimpleChatTemplate",
 ]
 

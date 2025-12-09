@@ -49,7 +49,6 @@ __all__ = [
     "OpenAIChatTemplate",
     "LlamaChatTemplate",
     "ChatMLTemplate",
-    "SimpleChatTemplate",
     "CHAT_TEMPLATE_REGISTRY",
     "create_chat_template",
 ]
