@@ -7,7 +7,7 @@ task_config: "rl_onoff/tasks/configs/math_default.yaml"  # Path to task config f
 dataset:
   name: "gsm8k_level1"  # Dataset name
   split: "test"  # "test" or "train"
-  num_examples: null  # null = process all, or integer to limit
+  num_examples: 10  # null = process all, or integer to limit
 
 # Backend configuration
 backend:
