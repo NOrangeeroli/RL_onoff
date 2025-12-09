@@ -169,9 +169,10 @@ class HuggingFaceBackend(BaseBackend):
             "do_sample": do_sample,
         }
         
-        # Handle stop strings - can be passed directly to model.generate
+        # Handle stop strings - need to pass tokenizer when using stop_strings
         if stop_strings is not None:
             gen_kwargs["stop_strings"] = stop_strings
+            gen_kwargs["tokenizer"] = self.tokenizer
         
         # Request scores (logits) if needed
         if return_logits or return_probs:
