@@ -34,7 +34,7 @@ class StructuredFormat(BaseFormat):
         Returns:
             The formatted question string
         """
-        return f"""{question}\nYour output must strictly follow this format:\n<think> high-level metacognitive reasoning, problem type classification, and generalized solving strategy here </think>\n<answer> detailed step-by-step solution here, ending with \\boxed{final result} </answer>"""
+        return f"""{question}\nYour output must strictly follow this format:\n<think> high-level metacognitive reasoning, problem type classification, and generalized solving strategy here </think>\n<answer> detailed step-by-step solution here, ending with \\boxed{{final result}} </answer>"""
 
 
     def get_assistant_prompt(self) -> str:

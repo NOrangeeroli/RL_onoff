@@ -34,7 +34,7 @@ class BoxedFormat(BaseFormat):
         Returns:
             The formatted question string
         """
-        return f"""{input}\nPlease reason step by step, and put your final answer within \\boxed{}."""
+        return f"""{question}\nPlease reason step by step, and put your final answer within \\boxed{{}}."""
     
     def get_assistant_prompt(self) -> str:
         """Get the assistant prompt for boxed format.
