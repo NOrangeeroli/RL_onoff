@@ -1,0 +1,209 @@
+================================================================================
+Dataset Inspection
+================================================================================
+Searching for data files in: /lustre/fast/fast/txiao/ym/rl_onoff/data
+
+Found 6 data file(s)
+
+================================================================================
+Dataset 1/6: data/aime2025/test.parquet
+================================================================================
+Full path: /lustre/fast/fast/txiao/ym/rl_onoff/data/aime2025/test.parquet
+
+Total entries: 30
+Columns/Keys (5): ['data_source', 'prompt', 'ability', 'reward_model', 'extra_info']
+
+--------------------------------------------------------------------------------
+First Entry:
+--------------------------------------------------------------------------------
+{
+  "data_source": "TianHongZXY/AIME2025",
+  "prompt": {
+    "content": "Find the sum of all integer bases $b>9$ for which $17_{b}$ is a divisor of $97_{b}$.",
+    "role": "user"
+  },
+  "ability": "math",
+  "reward_model": {
+    "ground_truth": {
+      "question": "Find the sum of all integer bases $b>9$ for which $17_{b}$ is a divisor of $97_{b}$.",
+      "target": "70"
+    },
+    "style": "rule"
+  },
+  "extra_info": {
+    "index": 0,
+    "split": "test"
+  }
+}
+
+================================================================================
+Dataset 2/6: data/amc23/test.parquet
+================================================================================
+Full path: /lustre/fast/fast/txiao/ym/rl_onoff/data/amc23/test.parquet
+
+Total entries: 40
+Columns/Keys (7): ['id', 'url', 'data_source', 'prompt', 'ability', 'reward_model', 'extra_info']
+
+--------------------------------------------------------------------------------
+First Entry:
+--------------------------------------------------------------------------------
+{
+  "id": 0,
+  "url": "https://artofproblemsolving.com/wiki/index.php/2023_AMC_12A_Problems/Problem_1",
+  "data_source": "TianHongZXY/amc23",
+  "prompt": {
+    "content": "Cities $A$ and $B$ are $45$ miles apart. Alicia lives in $A$ and Beth lives in $B$. Alicia bikes towards $B$ at 18 miles per hour. Leaving at the same time, Beth bikes toward $A$ at 12 miles per hour. How many miles from City $A$ will they be when they meet?",
+    "role": "user"
+  },
+  "ability": "math",
+  "reward_model": {
+    "ground_truth": {
+      "question": "Cities $A$ and $B$ are $45$ miles apart. Alicia lives in $A$ and Beth lives in $B$. Alicia bikes towards $B$ at 18 miles per hour. Leaving at the same time, Beth bikes toward $A$ at 12 miles per hour. How many miles from City $A$ will they be when they meet?",
+      "target": "27"
+    },
+    "style": "rule"
+  },
+  "extra_info": {
+    "index": 0,
+    "split": "test"
+  }
+}
+
+================================================================================
+Dataset 3/6: data/gsm8k_level1/test.parquet
+================================================================================
+Full path: /lustre/fast/fast/txiao/ym/rl_onoff/data/gsm8k_level1/test.parquet
+
+Total entries: 500
+Columns/Keys (9): ['solution', 'subject', 'level', 'unique_id', 'data_source', 'prompt', 'ability', 'reward_model', 'extra_info']
+
+--------------------------------------------------------------------------------
+First Entry:
+--------------------------------------------------------------------------------
+{
+  "solution": "Setting $x = 0,$ we get $|c| \\le 1.$  Setting $x = 1,$ we get\n\\[|a + b + c| \\le 1.\\]Setting $x = \\frac{1}{2},$ we get\n\\[\\left| \\frac{a}{4} + \\frac{b}{2} + c \\right| \\le 1.\\]Let\n\\begin{align*}\np &= c, ...",
+  "subject": "Intermediate Algebra",
+  "level": 5,
+  "unique_id": "test/intermediate_algebra/955.json",
+  "data_source": "simplelr_abel",
+  "prompt": {
+    "content": "Question:\nLet $a,$ $b,$ $c$ be real numbers such that\n\\[|ax^2 + bx + c| \\le 1\\]for all $0 \\le x \\le 1.$  Find the largest possible value of $|a| + |b| + |c|.$\nAnswer:\nLet's think step by step.\n",
+    "role": "user"
+  },
+  "ability": "math",
+  "reward_model": {
+    "ground_truth": "17",
+    "style": "rule"
+  },
+  "extra_info": {
+    "answer": "17",
+    "index": 0,
+    "level": 1,
+    "question": "Let $a,$ $b,$ $c$ be real numbers such that\n\\[|ax^2 + bx + c| \\le 1\\]for all $0 \\le x \\le 1.$  Find the largest possible value of $|a| + |b| + |c|.$",
+    "split": "test"
+  }
+}
+
+================================================================================
+Dataset 4/6: data/gsm8k_level1/train.parquet
+================================================================================
+Full path: /lustre/fast/fast/txiao/ym/rl_onoff/data/gsm8k_level1/train.parquet
+
+Total entries: 8,388
+Columns/Keys (6): ['target', 'data_source', 'prompt', 'ability', 'reward_model', 'extra_info']
+
+--------------------------------------------------------------------------------
+First Entry:
+--------------------------------------------------------------------------------
+{
+  "target": "Since 2 students did not eat their animal crackers, 20 - 2 = <<20-2=18>>18 students ate their animal crackers.\n\nThe students ate a total of 18 * 10 =<<18*10=180>>180 animal crackers\n\n# Answer\n\n180",
+  "data_source": "simplelr_abel",
+  "prompt": {
+    "content": "Mrs. Gable’s third grade class is on a field trip to the beach. For lunch, Mrs. Gable brought 20 lunches for the 20 students in her class. She included a pack of animal crackers in each lunch bag for dessert. Each pack of animal crackers contained 10 animal crackers. If 2 students did not eat their animal crackers, how many animal crackers were eaten in total among Mrs. Gable’s students?",
+    "role": "user"
+  },
+  "ability": "math",
+  "reward_model": {
+    "ground_truth": "180",
+    "style": "rule"
+  },
+  "extra_info": {
+    "answer": "180",
+    "index": 0,
+    "level": 1,
+    "question": "Mrs. Gable’s third grade class is on a field trip to the beach. For lunch, Mrs. Gable brought 20 lunches for the 20 students in her class. She included a pack of animal crackers in each lunch bag for dessert. Each pack of animal crackers contained 10 animal crackers. If 2 students did not eat their animal crackers, how many animal crackers were eaten in total among Mrs. Gable’s students?",
+    "split": "train"
+  }
+}
+
+================================================================================
+Dataset 5/6: data/math/test.parquet
+================================================================================
+Full path: /lustre/fast/fast/txiao/ym/rl_onoff/data/math/test.parquet
+
+Total entries: 5,000
+Columns/Keys (7): ['level', 'type', 'data_source', 'prompt', 'ability', 'reward_model', 'extra_info']
+
+--------------------------------------------------------------------------------
+First Entry:
+--------------------------------------------------------------------------------
+{
+  "level": "Level 3",
+  "type": "Algebra",
+  "data_source": "TianHongZXY/MATH",
+  "prompt": {
+    "content": "How many vertical asymptotes does the graph of $y=\\frac{2}{x^2+x-6}$ have?",
+    "role": "user"
+  },
+  "ability": "math",
+  "reward_model": {
+    "ground_truth": {
+      "question": "How many vertical asymptotes does the graph of $y=\\frac{2}{x^2+x-6}$ have?",
+      "solution": "The denominator of the rational function factors into $x^2+x-6=(x-2)(x+3)$. Since the numerator is always nonzero, there is a vertical asymptote whenever the denominator is $0$, which occurs for $x = 2$ and $x = -3$.  Therefore, the graph has $\\boxed{2}$ vertical asymptotes.",
+      "target": "2"
+    },
+    "style": "rule"
+  },
+  "extra_info": {
+    "index": 0,
+    "split": "test"
+  }
+}
+
+================================================================================
+Dataset 6/6: data/math/train.parquet
+================================================================================
+Full path: /lustre/fast/fast/txiao/ym/rl_onoff/data/math/train.parquet
+
+Total entries: 7,500
+Columns/Keys (7): ['level', 'type', 'data_source', 'prompt', 'ability', 'reward_model', 'extra_info']
+
+--------------------------------------------------------------------------------
+First Entry:
+--------------------------------------------------------------------------------
+{
+  "level": "Level 5",
+  "type": "Algebra",
+  "data_source": "TianHongZXY/MATH",
+  "prompt": {
+    "content": "Let \\[f(x) = \\left\\{\n\\begin{array}{cl} ax+3, &\\text{ if }x>2, \\\\\nx-5 &\\text{ if } -2 \\le x \\le 2, \\\\\n2x-b &\\text{ if } x <-2.\n\\end{array}\n\\right.\\]Find $a+b$ if the piecewise function is continuous (which means that its graph can be drawn without lifting your pencil from the paper).",
+    "role": "user"
+  },
+  "ability": "math",
+  "reward_model": {
+    "ground_truth": {
+      "question": "Let \\[f(x) = \\left\\{\n\\begin{array}{cl} ax+3, &\\text{ if }x>2, \\\\\nx-5 &\\text{ if } -2 \\le x \\le 2, \\\\\n2x-b &\\text{ if } x <-2.\n\\end{array}\n\\right.\\]Find $a+b$ if the piecewise function is continuous (which means that its graph can be drawn without lifting your pencil from the paper).",
+      "solution": "For the piecewise function to be continuous, the cases must \"meet\" at $2$ and $-2$. For example, $ax+3$ and $x-5$ must be equal when $x=2$. This implies $a(2)+3=2-5$, which we solve to get $2a=-6 \\Rightarrow a=-3$. Similarly, $x-5$ and $2x-b$ must be equal when $x=-2$. Substituting, we get $-2-5=2(-2)-b$, which implies $b=3$. So $a+b=-3+3=\\boxed{0}$.",
+      "target": "0"
+    },
+    "style": "rule"
+  },
+  "extra_info": {
+    "index": 0,
+    "split": "train"
+  }
+}
+
+================================================================================
+Inspection complete!
+================================================================================
