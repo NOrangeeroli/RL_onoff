@@ -4,14 +4,12 @@ from rl_onoff.tasks.chat_templates.base import BaseChatTemplate
 from rl_onoff.tasks.chat_templates.openai import OpenAIChatTemplate
 from rl_onoff.tasks.chat_templates.llama import LlamaChatTemplate
 from rl_onoff.tasks.chat_templates.chatml import ChatMLTemplate
-from rl_onoff.tasks.chat_templates.simple import SimpleChatTemplate
 
 # Registry mapping string names to chat template classes
 CHAT_TEMPLATE_REGISTRY = {
     "openai": OpenAIChatTemplate,
     "llama": LlamaChatTemplate,
     "chatml": ChatMLTemplate,
-    "simple": SimpleChatTemplate,
 }
 
 
