@@ -204,18 +204,19 @@ class TestSampler:
         # 2 samples * 2 batches = 4 calls
         assert backend.generate.call_count == 4
     
-    def test_sample_passes_additional_kwargs(self):
-        """Test that additional kwargs are passed to backend.generate."""
+    def test_sample_passes_config_parameters(self):
+        """Test that config parameters are passed to backend.generate."""
         backend = MockBackend()
         sampler = Sampler(backend)
         
         prompts = ["test prompt"]
-        results = sampler.sample(prompts, extra_arg="extra_value", another_arg=123)
+        config = SamplingConfig(max_new_tokens=10, temperature=0.8)
+        results = sampler.sample(prompts, config=config)
         
-        # Verify additional kwargs were passed
+        # Verify config parameters were passed
         call_kwargs = backend.generate.call_args[1]
-        assert call_kwargs["extra_arg"] == "extra_value"
-        assert call_kwargs["another_arg"] == 123
+        assert call_kwargs["max_new_tokens"] == 10
+        assert call_kwargs["temperature"] == 0.8
     
     def test_sample_empty_prompts_list(self):
         """Test sampling with empty prompts list."""

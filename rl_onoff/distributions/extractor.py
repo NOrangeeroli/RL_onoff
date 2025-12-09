@@ -163,8 +163,11 @@ if __name__ == "__main__":
         print("=" * 60)
         
         # Initialize backend (using a small model for demonstration)
+        from rl_onoff.backends.config import BackendConfig
+        from rl_onoff.backends import create_backend
         model_name = "gpt2"  # Replace with your preferred model
-        backend = HuggingFaceBackend(model_name=model_name)
+        config = BackendConfig(backend_type="huggingface", model_name=model_name)
+        backend = create_backend(config)
         
         # Create distribution extractor
         extractor = DistributionExtractor(backend)

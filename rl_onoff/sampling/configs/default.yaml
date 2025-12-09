@@ -1,0 +1,8 @@
+max_new_tokens: 256
+temperature: 1.0
+top_k: null  # null = no top_k filtering
+top_p: null  # null = no top_p filtering
+do_sample: true
+num_samples: 1
+seed: null  # null = random seed
+

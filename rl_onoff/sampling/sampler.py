@@ -24,8 +24,7 @@ class Sampler:
         self,
         prompts: List[str],
         config: Optional[SamplingConfig] = None,
-        batch_size: Optional[int] = None,
-        **kwargs
+        batch_size: Optional[int] = None
     ) -> List[Union[str, List[str]]]:
         """Sample text from multiple prompts in batches.
         
@@ -33,7 +32,6 @@ class Sampler:
             prompts: List of prompts
             config: Sampling configuration
             batch_size: Batch size for processing (None for all at once)
-            **kwargs: Additional generation arguments
             
         Returns:
             List of generated texts (or list of lists if num_samples > 1)
@@ -48,7 +46,6 @@ class Sampler:
             "top_k": config.top_k,
             "top_p": config.top_p,
             "do_sample": config.do_sample,
-            **kwargs
         }
 
         all_results = []
@@ -106,8 +103,11 @@ if __name__ == "__main__":
         print("=" * 60)
         
         # Initialize backend (using a small model for demonstration)
+        from rl_onoff.backends.config import BackendConfig
+        from rl_onoff.backends import create_backend
         model_name = "meta-llama/Llama-3.2-1B"  # Replace with your preferred model
-        backend = HuggingFaceBackend(model_name=model_name)
+        config = BackendConfig(backend_type="huggingface", model_name=model_name)
+        backend = create_backend(config)
         
         # Create sampler
         sampler = Sampler(backend)
@@ -146,19 +146,19 @@ if __name__ == "__main__":
             top_p=0.9,
             do_sample=True
         )
-        result = sampler.sample("The best way to learn programming is", config=config)
+        result = sampler.sample(["The best way to learn programming is"], config=config)
         print(f"Prompt: The best way to learn programming is")
-        print(f"Generated (temp=0.7, top_k=50, top_p=0.9): {result}\n")
+        print(f"Generated (temp=0.7, top_k=50, top_p=0.9): {result[0]}\n")
         
         # Example 4: Multiple samples per prompt
         print("=" * 60)
         print("Example 4: Multiple samples per prompt")
         print("=" * 60)
         config = SamplingConfig(max_new_tokens=15, num_samples=3)
-        results = sampler.sample("Once upon a time", config=config)
+        results = sampler.sample(["Once upon a time"], config=config)
         print(f"Prompt: Once upon a time")
         print(f"Generated {config.num_samples} samples:")
-        for i, sample in enumerate(results, 1):
+        for i, sample in enumerate(results[0], 1):
             print(f"  Sample {i}: {sample}")
         print()
         
@@ -167,9 +167,9 @@ if __name__ == "__main__":
         print("Example 5: Deterministic sampling (do_sample=False)")
         print("=" * 60)
         config = SamplingConfig(max_new_tokens=15, do_sample=False)
-        result = sampler.sample("The answer to life, the universe, and everything is", config=config)
+        result = sampler.sample(["The answer to life, the universe, and everything is"], config=config)
         print(f"Prompt: The answer to life, the universe, and everything is")
-        print(f"Generated (deterministic): {result}\n")
+        print(f"Generated (deterministic): {result[0]}\n")
         
         print("=" * 60)
         print("All examples completed successfully!")

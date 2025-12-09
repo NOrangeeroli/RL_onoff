@@ -19,25 +19,34 @@ REWARD_REGISTRY = {
 }
 
 
-def create_reward(name: str, **kwargs) -> BaseReward:
-    """Create a reward instance from a name.
+def create_reward(config: dict) -> BaseReward:
+    """Create a reward instance from a config dict.
     
     Args:
-        name: Name of the reward ("math_verify", "exact_match", "bleu", "rouge", "perplexity")
-        **kwargs: Additional arguments for reward creation
+        config: Dictionary with 'name' key and optional 'kwargs' key
+                Example: {"name": "math_verify", "kwargs": {...}}
+                Or: {"name": "exact_match"}
         
     Returns:
         Reward instance
         
     Raises:
-        ValueError: If name is not recognized
+        ValueError: If name is not recognized or config is invalid
     """
+    if not isinstance(config, dict):
+        raise ValueError(f"config must be a dict, got {type(config)}")
+    
+    name = config.get("name")
+    if name is None:
+        raise ValueError("config must have 'name' key")
+    
     if name not in REWARD_REGISTRY:
         raise ValueError(
             f"Unknown reward name: {name}. "
             f"Available: {list(REWARD_REGISTRY.keys())}"
         )
     
+    kwargs = config.get("kwargs", {})
     return REWARD_REGISTRY[name](**kwargs)
 
 

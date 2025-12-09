@@ -20,28 +20,33 @@ class SGLangBackend(BaseBackend):
 
     def __init__(
         self,
-        model_name: str,
-        tp_size: int = 1,
-        mem_fraction_static: float = 0.85,
-        **kwargs
+        config: 'BackendConfig'
     ):
         """Initialize SGLang backend.
         
         Args:
-            model_name: Model name or path
-            tp_size: Tensor parallelism size
-            mem_fraction_static: Memory fraction for static allocation
-            **kwargs: Additional SGLang arguments
+            config: BackendConfig instance with backend configuration
         """
+        from rl_onoff.backends.config import BackendConfig
+        
+        if not isinstance(config, BackendConfig):
+            raise TypeError(f"config must be a BackendConfig instance, got {type(config)}")
+        
+        if config.backend_type != "sglang":
+            raise ValueError(f"BackendConfig backend_type must be 'sglang', got '{config.backend_type}'")
+        
         if not SGLANG_AVAILABLE:
             raise ImportError(
                 "SGLang is not installed. Install it with: pip install 'sglang[all]'"
             )
         
-        super().__init__(model_name, **kwargs)
-        self.tp_size = tp_size
-        self.mem_fraction_static = mem_fraction_static
-        self.sglang_kwargs = kwargs
+        super().__init__(config.model_name)
+        
+        # Extract SGLang-specific parameters from config
+        self.tp_size = config.tp_size or 1
+        self.mem_fraction_static = config.mem_fraction_static or 0.85
+        self.context_length = config.context_length
+        self.sglang_kwargs = config.backend_kwargs or {}
 
     def load(self, **kwargs) -> None:
         """Load the SGLang runtime."""
@@ -154,11 +159,15 @@ if __name__ == "__main__":
         print("=" * 60)
         
         # Initialize backend (replace with your preferred model)
-        backend = SGLangBackend(
+        from rl_onoff.backends.config import BackendConfig
+        from rl_onoff.backends import create_backend
+        config = BackendConfig(
+            backend_type="sglang",
             model_name="meta-llama/Llama-3.2-1B",  # Replace with your model
             tp_size=1,
             mem_fraction_static=0.85
         )
+        backend = create_backend(config)
         
         # Generate text from a single prompt
         prompt = "The future of AI is"

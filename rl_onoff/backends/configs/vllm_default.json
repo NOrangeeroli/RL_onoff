@@ -1,9 +1,0 @@
-{
-  "backend_type": "vllm",
-  "model_name": "gpt2",
-  "tensor_parallel_size": null,
-  "gpu_memory_utilization": null,
-  "max_model_len": null,
-  "backend_kwargs": {}
-}
-

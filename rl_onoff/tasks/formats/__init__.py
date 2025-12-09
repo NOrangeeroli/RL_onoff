@@ -11,25 +11,34 @@ FORMAT_REGISTRY = {
 }
 
 
-def create_format(name: str, **kwargs) -> BaseFormat:
-    """Create a format instance from a name.
+def create_format(config: dict) -> BaseFormat:
+    """Create a format instance from a config dict.
     
     Args:
-        name: Name of the format ("boxed", "structured")
-        **kwargs: Additional arguments for format creation
+        config: Dictionary with 'name' key and optional 'kwargs' key
+                Example: {"name": "boxed", "kwargs": {...}}
+                Or: {"name": "structured"}
         
     Returns:
         Format instance
         
     Raises:
-        ValueError: If name is not recognized
+        ValueError: If name is not recognized or config is invalid
     """
+    if not isinstance(config, dict):
+        raise ValueError(f"config must be a dict, got {type(config)}")
+    
+    name = config.get("name")
+    if name is None:
+        raise ValueError("config must have 'name' key")
+    
     if name not in FORMAT_REGISTRY:
         raise ValueError(
             f"Unknown format name: {name}. "
             f"Available: {list(FORMAT_REGISTRY.keys())}"
         )
     
+    kwargs = config.get("kwargs", {})
     return FORMAT_REGISTRY[name](**kwargs)
 
 

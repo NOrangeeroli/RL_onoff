@@ -24,8 +24,8 @@ class MathTask(BaseTask):
                    If None, loads from configs/math_default.json
         """
         if config is None:
-            # Load default config from configs/math_default.json
-            config_path = Path(__file__).parent / "configs" / "math_default.json"
+            # Load default config from configs/math_default.yaml
+            config_path = Path(__file__).parent / "configs" / "math_default.yaml"
             config = str(config_path)
         
         super().__init__(config)

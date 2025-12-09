@@ -1,9 +1,0 @@
-{
-  "backend_type": "huggingface",
-  "model_name": "gpt2",
-  "device": null,
-  "torch_dtype": null,
-  "device_map": null,
-  "backend_kwargs": {}
-}
-

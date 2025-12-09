@@ -13,23 +13,42 @@ class HuggingFaceBackend(BaseBackend):
 
     def __init__(
         self,
-        model_name: str,
-        device: Optional[str] = None,
-        torch_dtype: Optional[torch.dtype] = None,
-        **kwargs
+        config: 'BackendConfig'
     ):
         """Initialize HuggingFace backend.
         
         Args:
-            model_name: HuggingFace model name or path
-            device: Device to load model on (default: auto-detect)
-            torch_dtype: Torch dtype for model (default: auto)
-            **kwargs: Additional arguments passed to model/tokenizer
+            config: BackendConfig instance with backend configuration
         """
-        super().__init__(model_name, **kwargs)
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        self.torch_dtype = torch_dtype
-        self.model_kwargs = kwargs
+        from rl_onoff.backends.config import BackendConfig
+        
+        if not isinstance(config, BackendConfig):
+            raise TypeError(f"config must be a BackendConfig instance, got {type(config)}")
+        
+        if config.backend_type != "huggingface":
+            raise ValueError(f"BackendConfig backend_type must be 'huggingface', got '{config.backend_type}'")
+        
+        super().__init__(config.model_name)
+        
+        # Extract HuggingFace-specific parameters from config
+        self.device = config.device or ("cuda" if torch.cuda.is_available() else "cpu")
+        
+        # Convert torch_dtype from string if needed
+        if config.torch_dtype is not None:
+            if isinstance(config.torch_dtype, str):
+                dtype_map = {
+                    "float32": torch.float32,
+                    "float16": torch.float16,
+                    "bfloat16": torch.bfloat16,
+                }
+                self.torch_dtype = dtype_map.get(config.torch_dtype, config.torch_dtype)
+            else:
+                self.torch_dtype = config.torch_dtype
+        else:
+            self.torch_dtype = None
+        
+        self.device_map = config.device_map
+        self.model_kwargs = config.backend_kwargs or {}
 
     def load(self, **kwargs) -> None:
         """Load the HuggingFace model and tokenizer."""
@@ -50,7 +69,9 @@ class HuggingFaceBackend(BaseBackend):
 
         # Prepare model loading kwargs
         model_kwargs = {}
-        if "device_map" in load_kwargs:
+        if self.device_map is not None:
+            model_kwargs["device_map"] = self.device_map
+        elif "device_map" in load_kwargs:
             model_kwargs["device_map"] = load_kwargs["device_map"]
         else:
             model_kwargs["device_map"] = self.device
@@ -258,10 +279,14 @@ if __name__ == "__main__":
     
     # Initialize backend (use a small model for testing, e.g., "gpt2")
     # Replace with your preferred model name
-    backend = HuggingFaceBackend(
+    from rl_onoff.backends.config import BackendConfig
+    from rl_onoff.backends import create_backend
+    config = BackendConfig(
+        backend_type="huggingface",
         model_name="meta-llama/Meta-Llama-3.1-8B-Instruct",  # Replace with your model
         device="cuda"  # Use "cuda" if GPU is available
     )
+    backend = create_backend(config)
     
     # Generate text from a single prompt
     prompt = "The future of AI is"

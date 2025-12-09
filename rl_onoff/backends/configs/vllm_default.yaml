@@ -1,0 +1,11 @@
+backend_type: vllm
+model_name: gpt2
+
+# vLLM-specific parameters
+tensor_parallel_size: null  # Number of GPUs for tensor parallelism (null = 1)
+gpu_memory_utilization: null  # GPU memory utilization ratio (null = 0.9)
+max_model_len: null  # Maximum model length (null = auto)
+
+# Additional kwargs for backend initialization
+backend_kwargs: {}
+

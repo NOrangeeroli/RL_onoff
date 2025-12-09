@@ -1,9 +1,0 @@
-{
-  "template_type": "chatml",
-  "reward_type": "math_verify",
-  "format_type": "structured",
-  "template_kwargs": {},
-  "reward_kwargs": {},
-  "format_kwargs": {}
-}
-

@@ -29,7 +29,7 @@ class BaseTask:
         """
         # Load config
         if isinstance(config, (str, Path)):
-            self.config = TaskConfig.from_json(config)
+            self.config = TaskConfig.from_file(config)
         elif isinstance(config, TaskConfig):
             self.config = config
         elif isinstance(config, dict):
@@ -40,18 +40,18 @@ class BaseTask:
         self.name = self.__class__.__name__
         
         # Create template, format and reward from config
-        self.template = create_chat_template(
-            self.config.template_type,
-            **(self.config.template_kwargs or {})
-        )
-        self.format = create_format(
-            self.config.format_type,
-            **(self.config.format_kwargs or {})
-        )
-        self.reward = create_reward(
-            self.config.reward_type,
-            **(self.config.reward_kwargs or {})
-        )
+        self.template = create_chat_template({
+            "name": self.config.template_type,
+            "kwargs": self.config.template_kwargs or {}
+        })
+        self.format = create_format({
+            "name": self.config.format_type,
+            "kwargs": self.config.format_kwargs or {}
+        })
+        self.reward = create_reward({
+            "name": self.config.reward_type,
+            "kwargs": self.config.reward_kwargs or {}
+        })
     
 
     def extract_answer(self, response: str) -> Dict[str, Optional[str]]:

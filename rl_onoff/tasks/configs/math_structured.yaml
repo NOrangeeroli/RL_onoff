@@ -1,0 +1,9 @@
+template_type: simple
+reward_type: math_verify
+format_type: structured
+
+# Additional parameters for template/reward/format creation
+template_kwargs: {}
+reward_kwargs: {}
+format_kwargs: {}
+

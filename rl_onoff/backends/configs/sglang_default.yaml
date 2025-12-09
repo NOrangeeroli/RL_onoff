@@ -1,0 +1,11 @@
+backend_type: sglang
+model_name: gpt2
+
+# SGLang-specific parameters
+tp_size: null  # Tensor parallelism size (null = 1)
+mem_fraction_static: null  # Memory fraction for static allocation (null = 0.85)
+context_length: null  # Context length (null = auto)
+
+# Additional kwargs for backend initialization
+backend_kwargs: {}
+

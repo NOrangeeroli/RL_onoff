@@ -31,7 +31,7 @@ def create_task(config: Union[str, Path, TaskConfig, dict]) -> BaseTask:
         
     Examples:
         >>> # From config file
-        >>> task = create_task("rl_onoff/tasks/configs/math_default.json")
+        >>> task = create_task("rl_onoff/tasks/configs/math_default.yaml")
         >>> 
         >>> # From TaskConfig
         >>> config = TaskConfig(template_type="simple", reward_type="math_verify", format_type="boxed")

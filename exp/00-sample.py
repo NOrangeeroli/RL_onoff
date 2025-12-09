@@ -16,6 +16,7 @@ from typing import List, Dict, Optional
 from tqdm import tqdm
 
 from rl_onoff.backends import create_backend
+from rl_onoff.backends.config import BackendConfig
 from rl_onoff.sampling import Sampler, SamplingConfig
 from rl_onoff.tasks import create_task
 from rl_onoff.utils.data_loader import load_data
@@ -86,7 +87,11 @@ def main(
     
     # Initialize backend
     print(f"\nLoading {backend_type} backend with model {model_name}...")
-    backend = create_backend(backend_type, model_name=model_name)
+    backend_config = BackendConfig(
+        backend_type=backend_type,
+        model_name=model_name
+    )
+    backend = create_backend(backend_config)
     backend.load()
     
     # Initialize sampler

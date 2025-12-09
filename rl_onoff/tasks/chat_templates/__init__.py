@@ -15,25 +15,34 @@ CHAT_TEMPLATE_REGISTRY = {
 }
 
 
-def create_chat_template(name: str, **kwargs) -> BaseChatTemplate:
-    """Create a chat template instance from a name.
+def create_chat_template(config: dict) -> BaseChatTemplate:
+    """Create a chat template instance from a config dict.
     
     Args:
-        name: Name of the chat template ("openai", "llama", "chatml", "simple")
-        **kwargs: Additional arguments for chat template creation
+        config: Dictionary with 'name' key and optional 'kwargs' key
+                Example: {"name": "openai", "kwargs": {...}}
+                Or: {"name": "simple"}
         
     Returns:
         Chat template instance
         
     Raises:
-        ValueError: If name is not recognized
+        ValueError: If name is not recognized or config is invalid
     """
+    if not isinstance(config, dict):
+        raise ValueError(f"config must be a dict, got {type(config)}")
+    
+    name = config.get("name")
+    if name is None:
+        raise ValueError("config must have 'name' key")
+    
     if name not in CHAT_TEMPLATE_REGISTRY:
         raise ValueError(
             f"Unknown chat template name: {name}. "
             f"Available: {list(CHAT_TEMPLATE_REGISTRY.keys())}"
         )
     
+    kwargs = config.get("kwargs", {})
     return CHAT_TEMPLATE_REGISTRY[name](**kwargs)
 
 

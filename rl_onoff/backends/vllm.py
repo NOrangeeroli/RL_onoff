@@ -19,28 +19,33 @@ class VLLMBackend(BaseBackend):
 
     def __init__(
         self,
-        model_name: str,
-        tensor_parallel_size: int = 1,
-        gpu_memory_utilization: float = 0.9,
-        **kwargs
+        config: 'BackendConfig'
     ):
         """Initialize vLLM backend.
         
         Args:
-            model_name: Model name or path
-            tensor_parallel_size: Number of GPUs for tensor parallelism
-            gpu_memory_utilization: GPU memory utilization ratio
-            **kwargs: Additional vLLM arguments
+            config: BackendConfig instance with backend configuration
         """
+        from rl_onoff.backends.config import BackendConfig
+        
+        if not isinstance(config, BackendConfig):
+            raise TypeError(f"config must be a BackendConfig instance, got {type(config)}")
+        
+        if config.backend_type != "vllm":
+            raise ValueError(f"BackendConfig backend_type must be 'vllm', got '{config.backend_type}'")
+        
         if not VLLM_AVAILABLE:
             raise ImportError(
                 "vLLM is not installed. Install it with: pip install vllm"
             )
         
-        super().__init__(model_name, **kwargs)
-        self.tensor_parallel_size = tensor_parallel_size
-        self.gpu_memory_utilization = gpu_memory_utilization
-        self.vllm_kwargs = kwargs
+        super().__init__(config.model_name)
+        
+        # Extract vLLM-specific parameters from config
+        self.tensor_parallel_size = config.tensor_parallel_size or 1
+        self.gpu_memory_utilization = config.gpu_memory_utilization or 0.9
+        self.max_model_len = config.max_model_len
+        self.vllm_kwargs = config.backend_kwargs or {}
 
     def load(self, **kwargs) -> None:
         """Load the vLLM model."""
@@ -53,6 +58,9 @@ class VLLMBackend(BaseBackend):
             **self.vllm_kwargs,
             **kwargs
         }
+        
+        if self.max_model_len is not None:
+            load_kwargs["max_model_len"] = self.max_model_len
 
         self.model = LLM(model=self.model_name, **load_kwargs)
         # vLLM doesn't expose tokenizer directly, but we can access it
@@ -157,11 +165,15 @@ if __name__ == "__main__":
         print("=" * 60)
         
         # Initialize backend (replace with your preferred model)
-        backend = VLLMBackend(
+        from rl_onoff.backends.config import BackendConfig
+        from rl_onoff.backends import create_backend
+        config = BackendConfig(
+            backend_type="vllm",
             model_name="meta-llama/Llama-3.2-1B",  # Replace with your model
             tensor_parallel_size=1,
             gpu_memory_utilization=0.9
         )
+        backend = create_backend(config)
         
         # Generate text from a single prompt
         prompt = "The future of AI is"
