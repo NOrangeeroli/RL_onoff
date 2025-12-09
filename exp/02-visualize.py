@@ -11,6 +11,13 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 import streamlit as st
 
+# Try to import transformers for tokenizer
+try:
+    from transformers import AutoTokenizer
+    TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    TRANSFORMERS_AVAILABLE = False
+
 # Add project root to Python path
 project_root = Path(__file__).parent.parent
 if str(project_root) not in sys.path:
@@ -41,6 +48,19 @@ def load_distributions(
     data["_distributions_file"] = str(distributions_file)
     
     return data
+
+
+@st.cache_resource
+def load_tokenizer(model_name: str):
+    """Load tokenizer for a given model name."""
+    if not TRANSFORMERS_AVAILABLE:
+        return None
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+        return tokenizer
+    except Exception as e:
+        st.warning(f"Could not load tokenizer for {model_name}: {e}")
+        return None
 
 
 @st.cache_data
@@ -284,22 +304,82 @@ def main():
                     top_k = st.slider("Number of top tokens to show", 10, 50, 20)
                     top_tokens = get_top_tokens(token_dist, top_k=top_k)
                     
-                    # Create bar chart
+                    # Create bar chart (will be created later with token labels)
                     probs = [t[1] for t in top_tokens]
                     
-                    # Display chart
-                    chart_data = {"Probability": probs}
-                    st.bar_chart(chart_data)
+                    # Show details with bounds checking
+                    if selected_token_idx < len(token_strings):
+                        st.write(f"**Selected token:** `{token_strings[selected_token_idx]}`")
+                    else:
+                        st.write(f"**Selected token:** N/A (index out of range)")
                     
-                    # Show details
-                    st.write(f"**Selected token:** `{token_strings[selected_token_idx]}`")
-                    st.write(f"**Token ID:** {selected_sample.get('token_ids', [])[selected_token_idx] if selected_token_idx < len(selected_sample.get('token_ids', [])) else 'N/A'}")
-                    st.write(f"**Entropy:** {per_token_entropy[selected_token_idx]:.4f}")
+                    token_ids_list = selected_sample.get('token_ids', [])
+                    if selected_token_idx < len(token_ids_list):
+                        st.write(f"**Token ID:** {token_ids_list[selected_token_idx]}")
+                    else:
+                        st.write(f"**Token ID:** N/A")
+                    
+                    if selected_token_idx < len(per_token_entropy):
+                        st.write(f"**Entropy:** {per_token_entropy[selected_token_idx]:.4f}")
+                    else:
+                        st.write(f"**Entropy:** N/A (index out of range)")
+                    
+                    # Get tokenizer to decode token IDs
+                    statistics = data.get("statistics", {})
+                    backend_info = statistics.get("backend", {})
+                    model_name = backend_info.get("model_name")
+                    
+                    # Create bar chart with token strings if possible
+                    token_labels = []
+                    if model_name and TRANSFORMERS_AVAILABLE:
+                        tokenizer = load_tokenizer(model_name)
+                        if tokenizer:
+                            for token_id, prob in top_tokens:
+                                try:
+                                    token_str = tokenizer.decode([token_id], skip_special_tokens=False)
+                                    # Clean up the token string
+                                    if token_str.startswith(" ") and len(token_str) > 1:
+                                        token_str = token_str[1:]
+                                    token_labels.append(f"{token_str[:20]}... (ID:{token_id})" if len(token_str) > 20 else f"{token_str} (ID:{token_id})")
+                                except:
+                                    token_labels.append(f"Token {token_id}")
+                        else:
+                            token_labels = [f"Token {tid}" for tid, _ in top_tokens]
+                    else:
+                        token_labels = [f"Token {tid}" for tid, _ in top_tokens]
+                    
+                    # Create DataFrame for better chart with labels
+                    try:
+                        import pandas as pd
+                        chart_df = pd.DataFrame({
+                            "Token": token_labels,
+                            "Probability": probs
+                        })
+                        chart_df = chart_df.set_index("Token")
+                        st.bar_chart(chart_df)
+                    except ImportError:
+                        # Fallback if pandas not available
+                        chart_data = {"Probability": probs}
+                        st.bar_chart(chart_data)
+                        st.caption("Token labels: " + ", ".join(token_labels[:5]) + "...")
                     
                     # Show top tokens table
                     with st.expander("Top tokens (expand to see details)"):
-                        for token_id, prob in top_tokens:
-                            st.write(f"Token ID {token_id}: {prob:.6f}")
+                        if model_name and TRANSFORMERS_AVAILABLE:
+                            tokenizer = load_tokenizer(model_name)
+                            if tokenizer:
+                                for token_id, prob in top_tokens:
+                                    try:
+                                        token_str = tokenizer.decode([token_id], skip_special_tokens=False)
+                                        st.write(f"Token ID {token_id} (`{token_str}`): {prob:.6f}")
+                                    except:
+                                        st.write(f"Token ID {token_id}: {prob:.6f}")
+                            else:
+                                for token_id, prob in top_tokens:
+                                    st.write(f"Token ID {token_id}: {prob:.6f}")
+                        else:
+                            for token_id, prob in top_tokens:
+                                st.write(f"Token ID {token_id}: {prob:.6f}")
             else:
                 st.warning("Distribution data not available. Loading...")
                 # Try to load if we have the index
@@ -316,10 +396,15 @@ def main():
     st.sidebar.header("Statistics")
     st.sidebar.write(f"**Total examples:** {len(results)}")
     st.sidebar.write(f"**Samples in this example:** {len(valid_samples)}")
-    if per_token_entropy:
+    if per_token_entropy and len(per_token_entropy) > 0:
+        # Check if all entropy values are 0
+        if all(e == 0.0 for e in per_token_entropy):
+            st.sidebar.warning("⚠️ All entropy values are 0.0 - this may indicate an issue with entropy calculation.")
         st.sidebar.write(f"**Average entropy:** {np.mean(per_token_entropy):.3f}")
         st.sidebar.write(f"**Min entropy:** {min(per_token_entropy):.3f}")
         st.sidebar.write(f"**Max entropy:** {max(per_token_entropy):.3f}")
+    elif not per_token_entropy:
+        st.sidebar.warning("⚠️ No entropy data available")
 
 
 if __name__ == "__main__":
