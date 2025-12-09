@@ -6,8 +6,14 @@ loads each one, and prints the first entry.
 """
 
 import json
+import sys
 from pathlib import Path
 from typing import List
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 from rl_onoff.utils.data_loader import load_data
 
