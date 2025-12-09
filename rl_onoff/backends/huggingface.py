@@ -50,7 +50,7 @@ class HuggingFaceBackend(BaseBackend):
         self.device_map = config.device_map
         self.model_kwargs = config.backend_kwargs or {}
 
-    def load(self, **kwargs) -> None:
+    def load(self) -> None:
         """Load the HuggingFace model and tokenizer."""
         if self._is_loaded:
             return
@@ -58,12 +58,13 @@ class HuggingFaceBackend(BaseBackend):
         print(f"Loading HuggingFace model: {self.model_name}")
         
         # Merge initialization kwargs with load kwargs
-        load_kwargs = {**self.model_kwargs, **kwargs}
+        load_kwargs = {**self.model_kwargs}
         
         # Load tokenizer
         print("Loading tokenizer...")
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_name,
+            padding_side="left",
             **{k: v for k, v in load_kwargs.items() if k not in ["device_map", "torch_dtype"]}
         )
         
@@ -102,6 +103,13 @@ class HuggingFaceBackend(BaseBackend):
             print(f"Moving model to device: {self.device}")
             self.model = self.model.to(self.device)
         
+        # Wrap model with DataParallel for multi-GPU data parallelism
+        # This splits batches across GPUs (each GPU processes different prompts)
+        if "device_map" not in model_kwargs and torch.cuda.device_count() > 1:
+            print(f"Wrapping model with DataParallel for {torch.cuda.device_count()} GPUs")
+            print("  Each GPU will process different prompts in the batch")
+            self.model = torch.nn.DataParallel(self.model)
+        
         self.model.eval()
         self._is_loaded = True
         print("Model loaded successfully!")
@@ -116,8 +124,7 @@ class HuggingFaceBackend(BaseBackend):
         do_sample: bool = True,
         stop_strings: Optional[List[str]] = None,
         return_logits: bool = False,
-        return_probs: bool = False,
-        **kwargs
+        return_probs: bool = False
     ) -> Union[str, List[str], Dict[str, Any], List[Dict[str, Any]]]:
         """Generate text from prompts."""
         if not self._is_loaded:
@@ -134,13 +141,20 @@ class HuggingFaceBackend(BaseBackend):
             padding=True,
             truncation=True,
         )
-        inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        # Determine target device for inputs
+        # If using DataParallel, inputs should go to the first GPU (cuda:0)
+        # DataParallel will automatically distribute across GPUs
+        if isinstance(self.model, torch.nn.DataParallel):
+            target_device = "cuda:0"
+        else:
+            target_device = self.device
+        
+        inputs = {k: v.to(target_device) for k, v in inputs.items()}
 
         # Prepare generation kwargs
         gen_kwargs = {
             "max_length": max_length,
             "do_sample": do_sample,
-            **kwargs
         }
         
         # Handle stop strings - can be passed directly to model.generate
@@ -234,7 +248,14 @@ class HuggingFaceBackend(BaseBackend):
             padding=True,
             truncation=True,
         )
-        full_inputs = {k: v.to(self.device) for k, v in full_inputs.items()}
+        # Determine target device for inputs
+        # If using DataParallel, inputs should go to the first GPU (cuda:0)
+        if isinstance(self.model, torch.nn.DataParallel):
+            target_device = "cuda:0"
+        else:
+            target_device = self.device
+        
+        full_inputs = {k: v.to(target_device) for k, v in full_inputs.items()}
 
         # Tokenize prompts separately to get prompt lengths
         prompt_inputs = self.tokenizer(
@@ -243,7 +264,7 @@ class HuggingFaceBackend(BaseBackend):
             padding=True,
             truncation=True,
         )
-        prompt_inputs = {k: v.to(self.device) for k, v in prompt_inputs.items()}
+        prompt_inputs = {k: v.to(target_device) for k, v in prompt_inputs.items()}
         prompt_lengths = prompt_inputs["input_ids"].shape[1]
 
         all_logits = []
@@ -308,7 +329,6 @@ if __name__ == "__main__":
     prompt = "The future of AI is"
     generated = backend.generate(
         prompt,
-        max_new_tokens=20,
         temperature=0.7,
         do_sample=True
     )
@@ -326,7 +346,6 @@ if __name__ == "__main__":
     ]
     generated_texts = backend.generate(
         prompts,
-        max_new_tokens=15,
         temperature=0.8
     )
     for prompt, text in zip(prompts, generated_texts):
