@@ -33,11 +33,12 @@ class BaseBackend(ABC):
     def generate(
         self,
         prompts: Union[str, List[str]],
-        max_new_tokens: int = 100,
+        max_length: int = 100,
         temperature: float = 1.0,
         top_k: Optional[int] = None,
         top_p: Optional[float] = None,
         do_sample: bool = True,
+        stop_strings: Optional[List[str]] = None,
         return_logits: bool = False,
         return_probs: bool = False,
         **kwargs
@@ -46,11 +47,12 @@ class BaseBackend(ABC):
         
         Args:
             prompts: Single prompt or list of prompts
-            max_new_tokens: Maximum number of tokens to generate
+            max_length: Maximum number of tokens to generate
             temperature: Sampling temperature
             top_k: Top-k sampling parameter
             top_p: Top-p (nucleus) sampling parameter
             do_sample: Whether to use sampling
+            stop_strings: List of strings that will stop generation when encountered
             return_logits: If True, return logits along with generated text
             return_probs: If True, return probabilities along with generated text
             **kwargs: Additional generation arguments

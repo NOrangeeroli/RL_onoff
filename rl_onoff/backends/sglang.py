@@ -53,13 +53,25 @@ class SGLangBackend(BaseBackend):
         if self._is_loaded:
             return
 
+        print(f"Loading SGLang model: {self.model_name}")
+        
         load_kwargs = {
             "tp_size": self.tp_size,
             "mem_fraction_static": self.mem_fraction_static,
             **self.sglang_kwargs,
             **kwargs
         }
+        
+        if self.context_length is not None:
+            load_kwargs["context_length"] = self.context_length
 
+        print(f"Configuration:")
+        print(f"  Tensor parallel size: {self.tp_size}")
+        print(f"  Memory fraction static: {self.mem_fraction_static}")
+        if self.context_length is not None:
+            print(f"  Context length: {self.context_length}")
+        
+        print("Starting SGLang runtime...")
         # Start SGLang runtime
         self.runtime = sgl.Runtime(
             model_path=self.model_name,
@@ -67,18 +79,21 @@ class SGLangBackend(BaseBackend):
         )
         
         # Get tokenizer
+        print("Loading tokenizer...")
         self.tokenizer = get_tokenizer(self.model_name, trust_remote_code=True)
         
         self._is_loaded = True
+        print("Model loaded successfully!")
 
     def generate(
         self,
         prompts: Union[str, List[str]],
-        max_new_tokens: int = 100,
+        max_length: int = 100,
         temperature: float = 1.0,
         top_k: Optional[int] = -1,
         top_p: Optional[float] = 1,
         do_sample: bool = True,
+        stop_strings: Optional[List[str]] = None,
         return_logits: bool = False,
         return_probs: bool = False,
         **kwargs
@@ -94,9 +109,13 @@ class SGLangBackend(BaseBackend):
         # Prepare sampling parameters
         sampling_params = {
             "temperature": temperature if do_sample else 0.0,
-            "max_new_tokens": max_new_tokens,
+            "max_new_tokens": max_length,
             **kwargs
         }
+        
+        # Handle stop strings
+        if stop_strings is not None:
+            sampling_params["stop"] = stop_strings
         
         if top_k is not None:
             sampling_params["top_k"] = top_k

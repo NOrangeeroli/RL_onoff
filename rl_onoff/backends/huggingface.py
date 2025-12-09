@@ -55,10 +55,13 @@ class HuggingFaceBackend(BaseBackend):
         if self._is_loaded:
             return
 
+        print(f"Loading HuggingFace model: {self.model_name}")
+        
         # Merge initialization kwargs with load kwargs
         load_kwargs = {**self.model_kwargs, **kwargs}
         
         # Load tokenizer
+        print("Loading tokenizer...")
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_name,
             **{k: v for k, v in load_kwargs.items() if k not in ["device_map", "torch_dtype"]}
@@ -71,17 +74,23 @@ class HuggingFaceBackend(BaseBackend):
         model_kwargs = {}
         if self.device_map is not None:
             model_kwargs["device_map"] = self.device_map
+            print(f"Using device_map: {self.device_map}")
         elif "device_map" in load_kwargs:
             model_kwargs["device_map"] = load_kwargs["device_map"]
+            print(f"Using device_map: {load_kwargs['device_map']}")
         else:
             model_kwargs["device_map"] = self.device
+            print(f"Using device: {self.device}")
 
         if self.torch_dtype is not None:
             model_kwargs["torch_dtype"] = self.torch_dtype
+            print(f"Using torch_dtype: {self.torch_dtype}")
         elif "torch_dtype" in load_kwargs:
             model_kwargs["torch_dtype"] = load_kwargs["torch_dtype"]
+            print(f"Using torch_dtype: {load_kwargs['torch_dtype']}")
 
         # Load model
+        print("Loading model...")
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_name,
             **model_kwargs,
@@ -90,19 +99,22 @@ class HuggingFaceBackend(BaseBackend):
         
         # If not using device_map, move model to device
         if "device_map" not in model_kwargs:
+            print(f"Moving model to device: {self.device}")
             self.model = self.model.to(self.device)
         
         self.model.eval()
         self._is_loaded = True
+        print("Model loaded successfully!")
 
     def generate(
         self,
         prompts: Union[str, List[str]],
-        max_new_tokens: int = 100,
+        max_length: int = 100,
         temperature: float = 1.0,
         top_k: Optional[int] = None,
         top_p: Optional[float] = None,
         do_sample: bool = True,
+        stop_strings: Optional[List[str]] = None,
         return_logits: bool = False,
         return_probs: bool = False,
         **kwargs
@@ -126,10 +138,14 @@ class HuggingFaceBackend(BaseBackend):
 
         # Prepare generation kwargs
         gen_kwargs = {
-            "max_new_tokens": max_new_tokens,
+            "max_length": max_length,
             "do_sample": do_sample,
             **kwargs
         }
+        
+        # Handle stop strings - can be passed directly to model.generate
+        if stop_strings is not None:
+            gen_kwargs["stop_strings"] = stop_strings
         
         # Request scores (logits) if needed
         if return_logits or return_probs:

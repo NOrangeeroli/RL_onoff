@@ -52,6 +52,8 @@ class VLLMBackend(BaseBackend):
         if self._is_loaded:
             return
 
+        print(f"Loading vLLM model: {self.model_name}")
+        
         load_kwargs = {
             "tensor_parallel_size": self.tensor_parallel_size,
             "gpu_memory_utilization": self.gpu_memory_utilization,
@@ -62,19 +64,28 @@ class VLLMBackend(BaseBackend):
         if self.max_model_len is not None:
             load_kwargs["max_model_len"] = self.max_model_len
 
+        print(f"Configuration:")
+        print(f"  Tensor parallel size: {self.tensor_parallel_size}")
+        print(f"  GPU memory utilization: {self.gpu_memory_utilization}")
+        if self.max_model_len is not None:
+            print(f"  Max model length: {self.max_model_len}")
+        
+        print("Loading model...")
         self.model = LLM(model=self.model_name, **load_kwargs)
         # vLLM doesn't expose tokenizer directly, but we can access it
         # through the model's tokenizer attribute
         self._is_loaded = True
+        print("Model loaded successfully!")
 
     def generate(
         self,
         prompts: Union[str, List[str]],
-        max_new_tokens: int = 100,
+        max_length: int = 100,
         temperature: float = 0.9,
         top_k: Optional[int] = -1,
         top_p: Optional[float] = 1,
         do_sample: bool = True,
+        stop_strings: Optional[List[str]] = None,
         return_logits: bool = False,
         return_probs: bool = False,
         **kwargs
@@ -88,13 +99,20 @@ class VLLMBackend(BaseBackend):
             prompts = [prompts]
 
         # Create sampling parameters
-        sampling_params = SamplingParams(
-            max_tokens=max_new_tokens,
-            temperature=temperature if do_sample else 0.0,
-            top_k=top_k,
-            top_p=top_p,
-            **kwargs
-        )
+        sampling_params_kwargs = {
+            "max_tokens": max_length,
+            "temperature": temperature if do_sample else 0.0,
+            "top_k": top_k,
+            "top_p": top_p,
+        }
+        
+        # Handle stop strings
+        if stop_strings is not None:
+            sampling_params_kwargs["stop"] = stop_strings
+        
+        # Merge with additional kwargs (kwargs override)
+        sampling_params_kwargs.update(kwargs)
+        sampling_params = SamplingParams(**sampling_params_kwargs)
 
         # Check if logits/probs are requested (not yet supported for vLLM)
         if return_logits or return_probs:
