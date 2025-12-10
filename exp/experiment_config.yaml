@@ -29,6 +29,7 @@
       device: null
       torch_dtype: null
       device_map: null
+      num_process: 2
 
   # Sampling configuration: either specify sampling_config file OR configure directly
   # Option 1: Use a sampling config file (backward compatible)
@@ -64,6 +65,7 @@
       device: null
       torch_dtype: null
       device_map: null
+      num_process: 2
 
   distribution:
     use_logits: false  # If true, extract logits; if false, extract probabilities

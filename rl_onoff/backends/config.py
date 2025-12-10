@@ -14,6 +14,7 @@ class HuggingFaceBackendConfig(Config):
     device: Optional[str] = None  # "cpu", "cuda", "cuda:0", etc.
     torch_dtype: Optional[str] = None  # "float32", "float16", "bfloat16"
     device_map: Optional[str] = None  # "auto", "balanced", etc.
+    num_process: Optional[int] = None  # Number of model replicas for data parallelism (hybrid parallelism)
 
 
 @dataclass
@@ -86,11 +87,12 @@ class BackendConfig(Config):
         # If backend_specific is not present, try to extract from top level (backward compatibility)
         if not backend_specific:
             # For HuggingFace
-            if any(k in data for k in ["device", "torch_dtype", "device_map"]):
+            if any(k in data for k in ["device", "torch_dtype", "device_map", "num_process"]):
                 backend_specific = {
                     "device": data.get("device"),
                     "torch_dtype": data.get("torch_dtype"),
                     "device_map": data.get("device_map"),
+                    "num_process": data.get("num_process"),
                 }
             # For vLLM
             elif any(k in data for k in ["tensor_parallel_size", "gpu_memory_utilization", "max_model_len"]):
@@ -113,6 +115,7 @@ class BackendConfig(Config):
                 "device": backend_specific.get("device"),
                 "torch_dtype": backend_specific.get("torch_dtype"),
                 "device_map": backend_specific.get("device_map"),
+                "num_process": backend_specific.get("num_process"),
             })
         elif backend_type == "vllm":
             backend_config = VLLMBackendConfig.from_dict({
