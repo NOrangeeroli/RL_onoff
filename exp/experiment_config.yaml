@@ -24,7 +24,7 @@
 
   backend:
     backend_type: "huggingface"
-    model_name: "Qwen/Qwen3-4B"
+    model_name: "Qwen/Qwen3-8B"
     backend_specific:
       device: null
       torch_dtype: null
@@ -59,7 +59,7 @@
 
   backend:
     backend_type: "huggingface"
-    model_name: "Qwen/Qwen3-4B"
+    model_name: "Qwen/Qwen3-8B"
     backend_specific:
       device: null
       torch_dtype: null
