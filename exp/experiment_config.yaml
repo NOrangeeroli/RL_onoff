@@ -44,7 +44,7 @@
     num_samples: 8  # Number of samples per prompt
     batch_size: 48  # Batch size for generation (null = no batching)
     seed: null  # Random seed (null = random)
-    stop_strings: ["\n\n"]  # Stop generation at these strings
+    stop_strings: null #["\n\n"]  # Stop generation at these strings
 
   output:
     dir: "exp/00-sample/output"  # Output directory (relative to project root)
