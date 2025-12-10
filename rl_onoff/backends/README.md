@@ -15,9 +15,10 @@ The HuggingFace backend uses the `transformers` library for inference.
 **Features:**
 - Full PyTorch integration
 - Support for all HuggingFace models
-- Multi-GPU data parallelism via `torch.nn.DataParallel`
+- Hybrid parallelism: data parallelism + tensor parallelism (via `num_process`)
 - Model parallelism via `device_map`
 - Support for logits/probabilities extraction
+- Gradient computation support (for gradient-based analysis)
 - Flexible device placement (CPU, CUDA, device_map)
 
 **Best for:**
@@ -149,16 +150,24 @@ backend_specific:
   device: "cuda"  # "cpu", "cuda", "cuda:0", etc. (null = auto-detect)
   torch_dtype: "float16"  # "float32", "float16", "bfloat16" (null = auto)
   device_map: "auto"  # "auto", "balanced", etc. (null = use device)
+  num_process: 2  # Number of model replicas for hybrid parallelism (null = single model)
 ```
 
 **Parameters:**
 - `device`: Target device for the model. If `null`, auto-detects CUDA availability.
 - `torch_dtype`: Data type for model weights. Useful for memory efficiency (`float16`, `bfloat16`).
 - `device_map`: Enables model parallelism. Options include `"auto"`, `"balanced"`, or custom mappings. If set, overrides `device`.
+- `num_process`: Number of model replicas for hybrid parallelism (data + tensor parallelism). Each replica uses `device_map="auto"` across its allocated GPUs. If `null`, uses a single model.
 
 **Multi-GPU Notes:**
-- If `device_map` is not set and multiple GPUs are available, the backend automatically uses `DataParallel` for data parallelism (splits batches across GPUs).
-- If `device_map` is set, it uses model parallelism (splits model layers across GPUs).
+- **Single Model**: If `num_process` is `null` or `1`:
+  - If `device_map` is not set and multiple GPUs are available, automatically uses `device_map="auto"` for model parallelism (splits layers across GPUs).
+  - If `device_map` is explicitly set, uses that strategy.
+- **Hybrid Parallelism**: If `num_process > 1`:
+  - Creates `num_process` model replicas (data parallelism).
+  - Each replica uses `device_map="auto"` across its allocated GPUs (tensor parallelism).
+  - GPUs are divided evenly among replicas (e.g., 4 GPUs with `num_process=2` → 2 GPUs per replica).
+  - Batches are automatically split across replicas for parallel processing.
 
 ### vLLM Configuration
 
@@ -214,15 +223,31 @@ class BaseBackend:
         stop_strings: Optional[List[str]] = None,
         return_logits: bool = False,
         return_probs: bool = False,
+        compute_gradients: bool = False,
     ) -> Union[str, List[str], Dict[str, Any], List[Dict[str, Any]]]:
-        """Generate text from prompts."""
+        """Generate text from prompts.
+        
+        Args:
+            compute_gradients: If True, enable gradient computation (for gradient-based analysis).
+                              Note: Gradient computation may require different device configurations
+                              and uses more memory. If using device_map="auto", gradients may not
+                              be fully supported - consider using single GPU mode for gradient computation.
+        """
     
     def get_logits(
         self,
         prompts: Union[str, List[str]],
         responses: Union[str, List[str]],
+        compute_gradients: bool = False,
     ) -> Union[np.ndarray, List[np.ndarray]]:
-        """Get token logits for response tokens given prompts."""
+        """Get token logits for response tokens given prompts.
+        
+        Args:
+            compute_gradients: If True, enable gradient computation (for gradient-based analysis).
+                              Note: Gradient computation may require different device configurations
+                              and uses more memory. If using device_map="auto", gradients may not
+                              be fully supported - consider using single GPU mode for gradient computation.
+        """
     
     def get_probabilities(
         self,
@@ -364,20 +389,6 @@ response2 = vllm_backend.generate("Hello")
 
 ## Backend-Specific Features
 
-### HuggingFace: Multi-GPU Data Parallelism
-
-The HuggingFace backend automatically uses `DataParallel` when multiple GPUs are available (unless `device_map` is set):
-
-```python
-# Automatically uses all available GPUs for data parallelism
-backend = create_backend({
-    "backend_type": "huggingface",
-    "model_name": "gpt2",
-    "backend_specific": {"device": "cuda"}  # No device_map
-})
-backend.load()  # Will print: "Wrapping model with DataParallel for N GPUs"
-```
-
 ### HuggingFace: Model Parallelism
 
 Use `device_map` for model parallelism (splits model layers across GPUs):
@@ -387,11 +398,62 @@ backend = create_backend({
     "backend_type": "huggingface",
     "model_name": "gpt2",
     "backend_specific": {
-        "device_map": "auto"  # Automatically distributes layers
+        "device_map": "auto"  # Automatically distributes layers across GPUs
     }
 })
 backend.load()
 ```
+
+### HuggingFace: Hybrid Parallelism (Data + Tensor Parallelism)
+
+Use `num_process` to enable hybrid parallelism, combining data parallelism (multiple model replicas) with tensor parallelism (layers split across GPUs within each replica):
+
+```python
+# Example: 4 GPUs, 2 replicas, 2 GPUs per replica
+backend = create_backend({
+    "backend_type": "huggingface",
+    "model_name": "gpt2",
+    "backend_specific": {
+        "num_process": 2  # 2 model replicas
+        # Each replica will use device_map="auto" across its allocated GPUs
+    }
+})
+backend.load()
+# Output:
+# Setting up 2 model replicas with 2 GPUs each
+# Total GPUs: 4, GPUs per replica: 2
+# Loading model replica 0 on GPUs [0, 1] (visible as cuda:0-1)
+# Loading model replica 1 on GPUs [2, 3] (visible as cuda:0-1)
+```
+
+**How it works:**
+- GPUs are divided evenly among replicas (e.g., 4 GPUs with `num_process=2` → GPUs [0,1] for replica 0, GPUs [2,3] for replica 1)
+- Each replica uses `CUDA_VISIBLE_DEVICES` to see only its allocated GPUs
+- Within each replica, `device_map="auto"` handles tensor parallelism (splits layers across the replica's GPUs)
+- Batches are automatically split across replicas for parallel processing
+
+**Gradient Computation:**
+
+For gradient-based analysis, you can enable gradient computation:
+
+```python
+# Generate with gradients enabled
+result = backend.generate(
+    "The capital of France is",
+    max_length=10,
+    compute_gradients=True
+)
+
+# Get logits with gradients enabled
+logits = backend.get_logits(
+    "The capital of France is",
+    "Paris",
+    compute_gradients=True
+)
+# Now you can compute loss and call .backward() on the logits
+```
+
+**Note:** Gradient computation with `device_map="auto"` may not be fully supported. For gradient computation, consider using a single GPU setup or a specific device mapping.
 
 ### vLLM: Tensor Parallelism
 
@@ -448,7 +510,7 @@ Choose a backend based on your needs:
 | **Memory Efficiency** | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
 | **Logits Extraction** | ✅ | ❌ | ❌ |
 | **Model Support** | All HF models | Many models | Many models |
-| **Multi-GPU** | Data + Model parallel | Tensor parallel | Tensor parallel |
+| **Multi-GPU** | Hybrid (Data + Tensor) | Tensor parallel | Tensor parallel |
 | **Best For** | Development, prototyping | Production, high throughput | Structured generation |
 
 ## Implementation Details
@@ -485,8 +547,12 @@ The configuration system automatically:
 ## Notes
 
 - Backends must be loaded (call `backend.load()`) before generating text
-- HuggingFace backend supports both data parallelism (via DataParallel) and model parallelism (via device_map), but not simultaneously
+- HuggingFace backend supports hybrid parallelism (data + tensor parallelism) via `num_process`:
+  - When `num_process > 1`, creates multiple model replicas (data parallelism)
+  - Each replica uses `device_map="auto"` for tensor parallelism across its allocated GPUs
+  - Batches are automatically split across replicas
 - Logits/probabilities extraction is currently only supported by HuggingFace backend
+- Gradient computation (`compute_gradients=True`) may not be fully supported with `device_map="auto"` - consider single GPU mode for gradient-based analysis
 - All backends use left padding for tokenization to support batched inference
 - Stop strings are handled by the underlying inference engines
 
