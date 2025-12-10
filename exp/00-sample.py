@@ -26,7 +26,7 @@ from rl_onoff.backends.config import BackendConfig
 from rl_onoff.sampling import Sampler
 from rl_onoff.sampling.config import SamplingConfig
 from rl_onoff.tasks import create_task
-from rl_onoff.utils.dataset import GSM8KLevel1Dataset
+from rl_onoff.utils.dataset import create_dataset
 
 
 def load_experiment_config(config_path: Optional[str] = None) -> dict:
@@ -116,11 +116,7 @@ def main(
     num_examples = dataset_config.get("num_examples")
     
     print(f"\nLoading {dataset_name} {dataset_split} dataset...")
-    if dataset_name == "gsm8k_level1":
-        dataset = GSM8KLevel1Dataset(split=dataset_split)
-    else:
-        raise ValueError(f"Unknown dataset: {dataset_name}")
-    
+    dataset = create_dataset(name=dataset_name, split=dataset_split)
     dataset.load()
     print(f"Loaded {len(dataset)} examples")
     

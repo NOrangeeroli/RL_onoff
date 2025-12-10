@@ -21,13 +21,13 @@
     format_kwargs: {}  # Additional kwargs for format creation
 
   dataset:
-    name: "gsm8k_level1"  # Dataset name
-    split: "test"  # "test" or "train"
+    name: "aime2025"  # Dataset name: "aime2025", "amc23", "gsm8k_level1", "math"
+    split: "test"  # "test" or "train" (availability depends on dataset)
     num_examples: 10  # null = process all, or integer to limit
 
   backend:
     backend_type: "huggingface"
-    model_name: "meta-llama/Llama-3.2-3B"
+    model_name: "Qwen/Qwen3-4B"
     backend_kwargs: {}
 
   # Sampling configuration: either specify sampling_config file OR configure directly
@@ -59,7 +59,7 @@
 
   backend:
     backend_type: "huggingface"
-    model_name: "meta-llama/Llama-3.2-3B"
+    model_name: "Qwen/Qwen3-4B"
     # Additional backend config can be added here if needed
     backend_kwargs: {}
 
