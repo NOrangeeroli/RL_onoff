@@ -38,8 +38,9 @@ try:
     tp_size = backend_specific.get('tp_size') or backend_specific.get('num_process')  # Backward compatibility
     
     # Calculate number of processes if tp_size is set
+    # num_processes = num_gpus // tp_size (data parallelism shards)
     num_processes = None
-    if backend_type == "huggingface" and tp_size is not None and tp_size > 1:
+    if backend_type == "huggingface" and tp_size is not None and tp_size > 0:
         # Get number of GPUs
         try:
             result = subprocess.run(['nvidia-smi', '--list-gpus'], capture_output=True, text=True, timeout=5)
@@ -47,6 +48,9 @@ try:
                 num_gpus = len([line for line in result.stdout.strip().split('\n') if line.strip()])
                 if num_gpus > 0 and num_gpus % tp_size == 0:
                     num_processes = num_gpus // tp_size
+                    # Only use accelerate launch if we have multiple processes (data parallelism)
+                    if num_processes == 1:
+                        num_processes = None  # Single process, no need for accelerate launch
         except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
             pass
     
