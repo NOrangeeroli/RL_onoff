@@ -3,6 +3,7 @@
 # If using vLLM, install compatible versions separately: pip install torch==2.5.1 torchvision==0.20.1
 torch>=2.0.0  # vLLM may require specific version (2.5.1), install separately if needed
 transformers>=4.30.0
+accelerate>=0.20.0  # Optional: for hybrid parallelism (data + tensor parallelism)
 numpy>=1.24.0,<2.0.0  # Constrained for llamafactory compatibility
 scipy>=1.10.0
 pandas>=2.0.0

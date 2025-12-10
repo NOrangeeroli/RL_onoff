@@ -6,6 +6,16 @@ import numpy as np
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+# Try to import accelerate for hybrid parallelism
+try:
+    from accelerate import Accelerator
+    from accelerate.utils import ParallelismConfig
+    ACCELERATE_AVAILABLE = True
+except ImportError:
+    ACCELERATE_AVAILABLE = False
+    Accelerator = None
+    ParallelismConfig = None
+
 from rl_onoff.backends.base import BaseBackend
 
 
@@ -58,6 +68,8 @@ class HuggingFaceBackend(BaseBackend):
         self.num_process = hf_config.num_process  # Number of replicas from config
         self.model_replicas = None  # Will store multiple replicas for data parallelism
         self.replica_gpu_mappings = None  # Store which GPUs each replica uses
+        self.accelerator = None  # Accelerate accelerator instance for hybrid parallelism
+        self.use_accelerate = False  # Whether to use Accelerate for parallelism
 
     def load(self) -> None:
         """Load the HuggingFace model and tokenizer."""
@@ -78,9 +90,15 @@ class HuggingFaceBackend(BaseBackend):
 
         # Check if we should set up replicas (hybrid parallelism)
         if self.num_process is not None and self.num_process > 1:
-            # Set up replicas with hybrid parallelism
-            self._setup_replicas(self.num_process)
-            return  # _setup_replicas handles model loading
+            # Try to use Accelerate for hybrid parallelism if available
+            if ACCELERATE_AVAILABLE:
+                self._setup_replicas_with_accelerate(self.num_process)
+                return  # _setup_replicas_with_accelerate handles model loading
+            else:
+                # Fallback to CUDA_VISIBLE_DEVICES approach
+                print("Warning: accelerate not available, falling back to sequential replica processing")
+                self._setup_replicas(self.num_process)
+                return  # _setup_replicas handles model loading
         
         # Prepare model loading kwargs for single model
         model_kwargs = {}
@@ -127,6 +145,87 @@ class HuggingFaceBackend(BaseBackend):
         self.model.eval()
         self._is_loaded = True
         print("Model loaded successfully!")
+
+    def _setup_replicas_with_accelerate(self, num_process: int) -> None:
+        """Set up model replicas using HuggingFace Accelerate with ParallelismConfig.
+        
+        This uses Accelerate's hybrid parallelism (data + tensor parallelism).
+        
+        Args:
+            num_process: Number of replicas (data parallelism)
+        """
+        if not ACCELERATE_AVAILABLE:
+            raise ImportError(
+                "accelerate is required for hybrid parallelism. "
+                "Install it with: pip install accelerate"
+            )
+        
+        # Load tokenizer first if not already loaded
+        if self.tokenizer is None:
+            print("Loading tokenizer...")
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.model_name,
+                padding_side="left",
+            )
+            if self.tokenizer.pad_token is None:
+                self.tokenizer.pad_token = self.tokenizer.eos_token
+        
+        num_gpus = torch.cuda.device_count()
+        if num_gpus == 0:
+            raise ValueError("CUDA not available. Cannot set up multi-GPU replicas.")
+        
+        if num_process > num_gpus:
+            raise ValueError(
+                f"num_process ({num_process}) cannot exceed number of GPUs ({num_gpus})"
+            )
+        
+        gpus_per_replica = num_gpus // num_process
+        if gpus_per_replica < 1:
+            raise ValueError(
+                f"Not enough GPUs ({num_gpus}) for {num_process} replicas. "
+                f"Need at least {num_process} GPUs."
+            )
+        
+        print(f"Setting up {num_process} model replicas with {gpus_per_replica} GPUs each using Accelerate")
+        print(f"Total GPUs: {num_gpus}, GPUs per replica: {gpus_per_replica}")
+        
+        # Configure hybrid parallelism
+        # dp_shard_size = num_process (data parallelism)
+        # tp_size = gpus_per_replica (tensor parallelism)
+        parallelism_config = ParallelismConfig(
+            dp_shard_size=num_process,
+            tp_size=gpus_per_replica,
+        )
+        
+        # Initialize Accelerator with parallelism config
+        self.accelerator = Accelerator(parallelism_config=parallelism_config)
+        self.use_accelerate = True
+        
+        print(f"Accelerate initialized with dp_shard_size={num_process}, tp_size={gpus_per_replica}")
+        
+        # Load model
+        print("Loading model with Accelerate...")
+        model_kwargs = {}
+        if self.torch_dtype is not None:
+            model_kwargs["torch_dtype"] = self.torch_dtype
+        
+        # Load model - Accelerate will handle distribution
+        self.model = AutoModelForCausalLM.from_pretrained(
+            self.model_name,
+            **model_kwargs
+        )
+        
+        # Prepare model with Accelerator
+        self.model = self.accelerator.prepare(self.model)
+        self.model.eval()
+        
+        # Print device information
+        print(f"Model prepared with Accelerate")
+        if hasattr(self.accelerator, 'device'):
+            print(f"  Accelerator device: {self.accelerator.device}")
+        
+        self._is_loaded = True
+        print("Model loaded successfully with Accelerate!")
 
     def _setup_replicas(self, num_process: int) -> None:
         """Set up model replicas using CUDA_VISIBLE_DEVICES approach.
@@ -254,8 +353,14 @@ class HuggingFaceBackend(BaseBackend):
         if is_single:
             prompts = [prompts]
 
+        # Use Accelerate if configured
+        if self.use_accelerate and self.accelerator is not None:
+            return self._generate_with_accelerate(
+                prompts, max_length, temperature, top_k, top_p, do_sample,
+                stop_strings, return_logits, return_probs, is_single, compute_gradients
+            )
         # Use replicas if available (set up during load() if num_process is in config)
-        if self.model_replicas and len(self.model_replicas) > 1:
+        elif self.model_replicas and len(self.model_replicas) > 1:
             return self._generate_with_replicas(
                 prompts, max_length, temperature, top_k, top_p, do_sample,
                 stop_strings, return_logits, return_probs, is_single, compute_gradients
@@ -401,7 +506,7 @@ class HuggingFaceBackend(BaseBackend):
         else:
             context_manager = torch.no_grad()
         
-        for replica_id, replica_model in enumerate(self.model_replicas):
+        for replica_id, replica_model in enumerate[Any](self.model_replicas):
             start_idx = replica_id * replica_batch_size
             end_idx = min(start_idx + replica_batch_size, batch_size)
             
@@ -533,12 +638,77 @@ class HuggingFaceBackend(BaseBackend):
         if len(prompts) != len(responses):
             raise ValueError(f"Number of prompts ({len(prompts)}) must match number of responses ({len(responses)})")
 
+        # Use Accelerate if configured
+        if self.use_accelerate and self.accelerator is not None:
+            return self._get_logits_with_accelerate(prompts, responses, is_single, compute_gradients)
         # Use replicas if available (set up during load() if num_process is in config)
-        if self.model_replicas and len(self.model_replicas) > 1:
+        elif self.model_replicas and len(self.model_replicas) > 1:
             return self._get_logits_with_replicas(prompts, responses, is_single, compute_gradients)
         else:
             # Single model path
             return self._get_logits_single(prompts, responses, is_single, compute_gradients)
+
+    def _get_logits_with_accelerate(
+        self,
+        prompts: List[str],
+        responses: List[str],
+        is_single: bool,
+        compute_gradients: bool,
+    ) -> Union[np.ndarray, List[np.ndarray]]:
+        """Get logits using Accelerate-prepared model (hybrid parallelism)."""
+        # Concatenate prompts and responses
+        full_texts = [prompt + response for prompt, response in zip(prompts, responses)]
+        
+        # Tokenize full texts
+        full_inputs = self.tokenizer(
+            full_texts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+        )
+        
+        # Tokenize prompts separately
+        prompt_inputs = self.tokenizer(
+            prompts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+        )
+        prompt_lengths = prompt_inputs["input_ids"].shape[1]
+        
+        # Move inputs to accelerator device
+        full_inputs = {k: v.to(self.accelerator.device) for k, v in full_inputs.items()}
+        prompt_inputs = {k: v.to(self.accelerator.device) for k, v in prompt_inputs.items()}
+        
+        all_logits = []
+        
+        # Conditionally enable/disable gradients
+        if compute_gradients:
+            context_manager = torch.enable_grad()
+        else:
+            context_manager = torch.no_grad()
+        
+        with context_manager:
+            # Get logits for the full sequence
+            outputs = self.model(**full_inputs)
+            logits = outputs.logits  # (batch_size, seq_len, vocab_size)
+            
+            # Extract logits for solution tokens only
+            for i in range(len(prompts)):
+                prompt_len = (prompt_inputs["input_ids"][i] != self.tokenizer.pad_token_id).sum().item()
+                if self.tokenizer.pad_token_id is None:
+                    prompt_len = prompt_lengths
+                
+                seq_len = (full_inputs["input_ids"][i] != self.tokenizer.pad_token_id).sum().item()
+                if self.tokenizer.pad_token_id is None:
+                    seq_len = full_inputs["input_ids"].shape[1]
+                
+                response_logits = logits[i, prompt_len-1:seq_len-1, :]
+                all_logits.append(response_logits.cpu().numpy())
+        
+        if is_single:
+            return all_logits[0]
+        return all_logits
 
     def _get_logits_single(
         self,
