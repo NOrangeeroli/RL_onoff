@@ -43,7 +43,7 @@
     top_p: null  # Nucleus sampling (null = disabled)
     do_sample: true  # Whether to use sampling (false = greedy)
     num_samples: 8  # Number of samples per prompt
-    batch_size: 128  # Batch size for generation (null = no batching)
+    batch_size: 48  # Batch size for generation (null = no batching)
     seed: null  # Random seed (null = random)
     stop_strings: null #["\n\n"]  # Stop generation at these strings
 
