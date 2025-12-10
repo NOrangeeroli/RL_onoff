@@ -418,6 +418,16 @@ class HuggingFaceBackend(BaseBackend):
                 truncation=True,
             )
             
+            # Move inputs to the correct device for this replica
+            # When using device_map="auto", check the model's device
+            if hasattr(replica_model, 'hf_device_map'):
+                # Model uses device_map - inputs should go to the first device in the map
+                first_device = next(iter(replica_model.hf_device_map.values()))
+                replica_inputs = {k: v.to(first_device) for k, v in replica_inputs.items()}
+            else:
+                # Fallback: move to cuda:0 (each replica sees its GPUs as cuda:0, cuda:1, etc.)
+                replica_inputs = {k: v.to("cuda:0") for k, v in replica_inputs.items()}
+            
             # Prepare generation kwargs
             gen_kwargs = {
                 "max_length": max_length,
@@ -676,6 +686,18 @@ class HuggingFaceBackend(BaseBackend):
             truncation=True,
         )
         prompt_lengths = prompt_inputs["input_ids"].shape[1]
+        
+        # Move inputs to the correct device for this replica
+        # When using device_map="auto", check the model's device
+        if hasattr(model, 'hf_device_map'):
+            # Model uses device_map - inputs should go to the first device in the map
+            first_device = next(iter(model.hf_device_map.values()))
+            full_inputs = {k: v.to(first_device) for k, v in full_inputs.items()}
+            prompt_inputs = {k: v.to(first_device) for k, v in prompt_inputs.items()}
+        else:
+            # Fallback: move to cuda:0 (each replica sees its GPUs as cuda:0, cuda:1, etc.)
+            full_inputs = {k: v.to("cuda:0") for k, v in full_inputs.items()}
+            prompt_inputs = {k: v.to("cuda:0") for k, v in prompt_inputs.items()}
         
         # Get logits (device_map handles device placement automatically)
         with context_manager:

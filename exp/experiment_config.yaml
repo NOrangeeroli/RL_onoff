@@ -18,7 +18,7 @@
     format_type: "boxed"  # Options: "boxed", "structured"
 
   dataset:
-    name: "aime2025"  # Dataset name: "aime2025", "amc23", "gsm8k_level1", "math"
+    name: "gsm8k_level1"  # Dataset name: "aime2025", "amc23", "gsm8k_level1", "math"
     split: "test"  # "test" or "train" (availability depends on dataset)
     num_examples: 10  # null = process all, or integer to limit
 
