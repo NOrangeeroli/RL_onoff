@@ -74,11 +74,17 @@ class HuggingFaceBackend(BaseBackend):
 
         # Prepare model loading kwargs
         model_kwargs = {}
+        
+        # Determine device_map: use "auto" if not specified and multiple GPUs available
         if self.device_map is not None:
             model_kwargs["device_map"] = self.device_map
             print(f"Using device_map: {self.device_map}")
+        elif torch.cuda.device_count() > 1:
+            # Use "auto" for multi-GPU setups
+            model_kwargs["device_map"] = "auto"
+            print(f"Using device_map: auto (for {torch.cuda.device_count()} GPUs)")
         else:
-            # Will set device manually after loading
+            # Single GPU or CPU: will set device manually after loading
             print(f"Using device: {self.device}")
 
         if self.torch_dtype is not None:
@@ -97,16 +103,8 @@ class HuggingFaceBackend(BaseBackend):
             print(f"Moving model to device: {self.device}")
             self.model = self.model.to(self.device)
         
-        # Wrap model with DataParallel for multi-GPU data parallelism
-        # This splits batches across GPUs (each GPU processes different prompts)
-        if "device_map" not in model_kwargs and torch.cuda.device_count() > 1:
-            print(f"Wrapping model with DataParallel for {torch.cuda.device_count()} GPUs")
-            print("  Each GPU will process different prompts in the batch")
-            self.model = torch.nn.DataParallel(self.model)
-            # Print actual devices that will be used
-            devices_used = [f"cuda:{i}" for i in range(torch.cuda.device_count())]
-            print(f"  Devices used for generation: {devices_used}")
-        elif "device_map" in model_kwargs:
+        # Print device information
+        if "device_map" in model_kwargs:
             # When using device_map, print the actual device mapping
             if hasattr(self.model, 'hf_device_map'):
                 print(f"  Model device mapping: {self.model.hf_device_map}")
@@ -148,14 +146,12 @@ class HuggingFaceBackend(BaseBackend):
             truncation=True,
         )
         # Determine target device for inputs
-        # If using DataParallel, inputs should go to the first GPU (cuda:0)
-        # DataParallel will automatically distribute across GPUs
-        if isinstance(self.model, torch.nn.DataParallel):
-            target_device = "cuda:0"
-        else:
-            target_device = self.device
-        
-        inputs = {k: v.to(target_device) for k, v in inputs.items()}
+        # If using device_map, the model will automatically handle device placement
+        # Otherwise, move inputs to the specified device
+        if not hasattr(self.model, 'hf_device_map'):
+            # Not using device_map: move inputs to device
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        # If using device_map, inputs will be automatically moved by the model's generate() method
 
         # Prepare generation kwargs
         gen_kwargs = {
@@ -181,17 +177,15 @@ class HuggingFaceBackend(BaseBackend):
                 gen_kwargs["top_p"] = top_p
 
         # Generate
-        # Get the actual model (unwrap DataParallel if needed)
-        model_to_use = self.model.module if isinstance(self.model, torch.nn.DataParallel) else self.model
-        
+        # Note: device_map handles multi-GPU automatically, no need to unwrap DataParallel
         with torch.no_grad():
             if return_logits or return_probs:
-                outputs = model_to_use.generate(**inputs, **gen_kwargs)
+                outputs = self.model.generate(**inputs, **gen_kwargs)
                 # outputs is a GenerateDecoderOnlyOutput object
                 generated_ids = outputs.sequences
                 scores = outputs.scores  # List of tensors, one per generated token
             else:
-                outputs = model_to_use.generate(**inputs, **gen_kwargs)
+                outputs = self.model.generate(**inputs, **gen_kwargs)
                 generated_ids = outputs
 
         # Decode outputs (remove input tokens)
@@ -258,13 +252,12 @@ class HuggingFaceBackend(BaseBackend):
             truncation=True,
         )
         # Determine target device for inputs
-        # If using DataParallel, inputs should go to the first GPU (cuda:0)
-        if isinstance(self.model, torch.nn.DataParallel):
-            target_device = "cuda:0"
-        else:
-            target_device = self.device
-        
-        full_inputs = {k: v.to(target_device) for k, v in full_inputs.items()}
+        # If using device_map, the model will automatically handle device placement
+        # Otherwise, move inputs to the specified device
+        if not hasattr(self.model, 'hf_device_map'):
+            # Not using device_map: move inputs to device
+            full_inputs = {k: v.to(self.device) for k, v in full_inputs.items()}
+        # If using device_map, inputs will be automatically moved by the model
 
         # Tokenize prompts separately to get prompt lengths
         prompt_inputs = self.tokenizer(
@@ -273,17 +266,19 @@ class HuggingFaceBackend(BaseBackend):
             padding=True,
             truncation=True,
         )
-        prompt_inputs = {k: v.to(target_device) for k, v in prompt_inputs.items()}
+        # Move prompt_inputs to same device as full_inputs
+        if not hasattr(self.model, 'hf_device_map'):
+            # Not using device_map: move to device
+            prompt_inputs = {k: v.to(self.device) for k, v in prompt_inputs.items()}
+        # If using device_map, inputs will be automatically moved by the model
         prompt_lengths = prompt_inputs["input_ids"].shape[1]
 
         all_logits = []
         
-        # Get the actual model (unwrap DataParallel if needed)
-        model_to_use = self.model.module if isinstance(self.model, torch.nn.DataParallel) else self.model
-        
+        # Note: device_map handles multi-GPU automatically, no need to unwrap DataParallel
         with torch.no_grad():
             # Get logits for the full sequence
-            outputs = model_to_use(**full_inputs)
+            outputs = self.model(**full_inputs)
             logits = outputs.logits  # (batch_size, seq_len, vocab_size)
             
             # Extract logits for solution tokens only
