@@ -4,6 +4,7 @@ from typing import List, Dict, Optional, Union, Any
 import os
 import numpy as np
 import torch
+import torch.distributed as dist
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # Try to import accelerate for hybrid parallelism
@@ -65,10 +66,8 @@ class HuggingFaceBackend(BaseBackend):
             self.torch_dtype = None
         
         self.device_map = hf_config.device_map
-        self.num_process = hf_config.num_process  # Number of replicas from config
-        self.model_replicas = None  # Will store multiple replicas for data parallelism
-        self.replica_gpu_mappings = None  # Store which GPUs each replica uses
-        self.accelerator = None  # Accelerate accelerator instance for hybrid parallelism
+        self.num_process = hf_config.num_process  # Number of replicas from config (data parallelism)
+        self.accelerator = None  # Accelerate accelerator instance for parallelism
         self.use_accelerate = False  # Whether to use Accelerate for parallelism
 
     def load(self) -> None:
@@ -88,17 +87,44 @@ class HuggingFaceBackend(BaseBackend):
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        # Check if we should set up replicas (hybrid parallelism)
-        if self.num_process is not None and self.num_process > 1:
-            # Try to use Accelerate for hybrid parallelism if available
-            if ACCELERATE_AVAILABLE:
-                self._setup_replicas_with_accelerate(self.num_process)
-                return  # _setup_replicas_with_accelerate handles model loading
+        # Check if we need parallelism (multi-GPU or multi-process)
+        num_gpus = torch.cuda.device_count()
+        needs_parallelism = (
+            (self.num_process is not None and self.num_process > 1) or
+            (num_gpus > 1 and (self.device_map == "auto" or self.device_map is None))
+        )
+        
+        if needs_parallelism:
+            if not ACCELERATE_AVAILABLE:
+                raise ImportError(
+                    "accelerate is required for multi-GPU/multi-process parallelism. "
+                    "Install it with: pip install accelerate"
+                )
+            
+            # Calculate parallelism parameters
+            if self.num_process is not None and self.num_process > 1:
+                # Multi-process case (data parallel or hybrid)
+                if num_gpus == 0:
+                    raise ValueError("CUDA not available. Cannot set up multi-process parallelism.")
+                if self.num_process > num_gpus:
+                    raise ValueError(
+                        f"num_process ({self.num_process}) cannot exceed number of GPUs ({num_gpus})"
+                    )
+                gpus_per_replica = num_gpus // self.num_process
+                if gpus_per_replica < 1:
+                    raise ValueError(
+                        f"Not enough GPUs ({num_gpus}) for {self.num_process} replicas. "
+                        f"Need at least {self.num_process} GPUs."
+                    )
+                dp_shard_size = self.num_process
+                tp_size = gpus_per_replica
             else:
-                # Fallback to CUDA_VISIBLE_DEVICES approach
-                print("Warning: accelerate not available, falling back to sequential replica processing")
-                self._setup_replicas(self.num_process)
-                return  # _setup_replicas handles model loading
+                # Pure model parallel (single process, multiple GPUs)
+                dp_shard_size = 1
+                tp_size = num_gpus
+            
+            self._setup_with_accelerate(dp_shard_size, tp_size)
+            return
         
         # Prepare model loading kwargs for single model
         model_kwargs = {}
@@ -146,62 +172,103 @@ class HuggingFaceBackend(BaseBackend):
         self._is_loaded = True
         print("Model loaded successfully!")
 
-    def _setup_replicas_with_accelerate(self, num_process: int) -> None:
-        """Set up model replicas using HuggingFace Accelerate with ParallelismConfig.
+    def _setup_with_accelerate(self, dp_shard_size: int, tp_size: int) -> None:
+        """Set up model using HuggingFace Accelerate with ParallelismConfig.
         
-        This uses Accelerate's hybrid parallelism (data + tensor parallelism).
+        This uses Accelerate for all parallelism cases:
+        - Pure data parallel: dp_shard_size > 1, tp_size = 1
+        - Pure model parallel: dp_shard_size = 1, tp_size > 1
+        - Hybrid: dp_shard_size > 1, tp_size > 1
         
         Args:
-            num_process: Number of replicas (data parallelism)
+            dp_shard_size: Number of data parallel shards
+            tp_size: Number of GPUs per shard (tensor parallelism)
         """
         if not ACCELERATE_AVAILABLE:
             raise ImportError(
-                "accelerate is required for hybrid parallelism. "
+                "accelerate is required for parallelism. "
                 "Install it with: pip install accelerate"
             )
         
-        # Load tokenizer first if not already loaded
-        if self.tokenizer is None:
-            print("Loading tokenizer...")
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                self.model_name,
-                padding_side="left",
-            )
-            if self.tokenizer.pad_token is None:
-                self.tokenizer.pad_token = self.tokenizer.eos_token
-        
         num_gpus = torch.cuda.device_count()
         if num_gpus == 0:
-            raise ValueError("CUDA not available. Cannot set up multi-GPU replicas.")
+            raise ValueError("CUDA not available. Cannot set up multi-GPU parallelism.")
         
-        if num_process > num_gpus:
+        total_gpus_needed = dp_shard_size * tp_size
+        if total_gpus_needed > num_gpus:
             raise ValueError(
-                f"num_process ({num_process}) cannot exceed number of GPUs ({num_gpus})"
+                f"Not enough GPUs ({num_gpus}) for requested parallelism "
+                f"(dp_shard_size={dp_shard_size}, tp_size={tp_size}, total={total_gpus_needed})"
             )
         
-        gpus_per_replica = num_gpus // num_process
-        if gpus_per_replica < 1:
-            raise ValueError(
-                f"Not enough GPUs ({num_gpus}) for {num_process} replicas. "
-                f"Need at least {num_process} GPUs."
-            )
+        # Determine parallelism type for logging
+        if dp_shard_size > 1 and tp_size > 1:
+            parallelism_type = "hybrid (data + tensor)"
+        elif dp_shard_size > 1:
+            parallelism_type = "data parallel"
+        elif tp_size > 1:
+            parallelism_type = "model parallel"
+        else:
+            parallelism_type = "single GPU"
         
-        print(f"Setting up {num_process} model replicas with {gpus_per_replica} GPUs each using Accelerate")
-        print(f"Total GPUs: {num_gpus}, GPUs per replica: {gpus_per_replica}")
+        print(f"Setting up {parallelism_type} using Accelerate")
+        print(f"  Data parallel shards: {dp_shard_size}")
+        print(f"  Tensor parallel size: {tp_size}")
+        print(f"  Total GPUs: {num_gpus}")
         
-        # Configure hybrid parallelism
-        # dp_shard_size = num_process (data parallelism)
-        # tp_size = gpus_per_replica (tensor parallelism)
+        # Manual distributed initialization if not already initialized
+        # When using accelerate launch, distributed should be initialized, but ParallelismConfig
+        # might need it initialized before creating the Accelerator
+        if not dist.is_initialized():
+            print("Distributed not initialized, setting up manually...")
+            # Check if environment variables are set (e.g., by accelerate launch or torchrun)
+            rank = int(os.environ.get('RANK', '0'))
+            world_size = int(os.environ.get('WORLD_SIZE', str(dp_shard_size)))
+            local_rank = int(os.environ.get('LOCAL_RANK', '0'))
+            
+            # Set up missing environment variables
+            if 'MASTER_ADDR' not in os.environ:
+                os.environ['MASTER_ADDR'] = 'localhost'
+            if 'MASTER_PORT' not in os.environ:
+                os.environ['MASTER_PORT'] = '29500'
+            
+            # Initialize process group
+            try:
+                dist.init_process_group(
+                    backend='nccl',
+                    init_method='env://',
+                    world_size=world_size,
+                    rank=rank
+                )
+                print(f"Distributed initialized: rank={rank}, world_size={world_size}, local_rank={local_rank}")
+            except Exception as e:
+                raise RuntimeError(
+                    f"Failed to initialize distributed environment: {e}\n"
+                    f"To use Accelerate with ParallelismConfig, either:\n"
+                    f"  1. Launch with: accelerate launch --num_processes={dp_shard_size} your_script.py\n"
+                    f"  2. Launch with: torchrun --nproc_per_node={dp_shard_size} your_script.py\n"
+                    f"  3. Or ensure distributed environment variables (RANK, WORLD_SIZE, LOCAL_RANK) are set correctly"
+                )
+        else:
+            rank = dist.get_rank()
+            world_size = dist.get_world_size()
+            print(f"Distributed already initialized: rank={rank}, world_size={world_size}")
+            
+            # Verify world_size matches dp_shard_size
+            if world_size != dp_shard_size:
+                print(f"Warning: WORLD_SIZE ({world_size}) does not match dp_shard_size ({dp_shard_size})")
+        
+        # Configure parallelism
         parallelism_config = ParallelismConfig(
-            dp_shard_size=num_process,
-            tp_size=gpus_per_replica,
+            dp_shard_size=dp_shard_size,
+            tp_size=tp_size,
         )
         
         # Initialize Accelerator with parallelism config
         self.accelerator = Accelerator(parallelism_config=parallelism_config)
         self.use_accelerate = True
         
-        print(f"Accelerate initialized with dp_shard_size={num_process}, tp_size={gpus_per_replica}")
+        print(f"Accelerate initialized with dp_shard_size={dp_shard_size}, tp_size={tp_size}")
         
         # Load model
         print("Loading model with Accelerate...")
@@ -226,95 +293,6 @@ class HuggingFaceBackend(BaseBackend):
         
         self._is_loaded = True
         print("Model loaded successfully with Accelerate!")
-
-    def _setup_replicas(self, num_process: int) -> None:
-        """Set up model replicas using CUDA_VISIBLE_DEVICES approach.
-        
-        This is the standard way: each replica sees only its allocated GPUs,
-        and device_map="auto" handles tensor parallelism within those GPUs.
-        
-        Args:
-            num_process: Number of replicas (data parallelism)
-        """
-        if self.model_replicas is not None and len(self.model_replicas) == num_process:
-            # Already set up correctly
-            return
-        
-        # Load tokenizer first if not already loaded
-        if self.tokenizer is None:
-            print("Loading tokenizer...")
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                self.model_name,
-                padding_side="left",
-            )
-            if self.tokenizer.pad_token is None:
-                self.tokenizer.pad_token = self.tokenizer.eos_token
-        
-        num_gpus = torch.cuda.device_count()
-        if num_gpus == 0:
-            raise ValueError("CUDA not available. Cannot set up multi-GPU replicas.")
-        
-        if num_process > num_gpus:
-            raise ValueError(
-                f"num_process ({num_process}) cannot exceed number of GPUs ({num_gpus})"
-            )
-        
-        gpus_per_replica = num_gpus // num_process
-        if gpus_per_replica < 1:
-            raise ValueError(
-                f"Not enough GPUs ({num_gpus}) for {num_process} replicas. "
-                f"Need at least {num_process} GPUs."
-            )
-        
-        print(f"Setting up {num_process} model replicas with {gpus_per_replica} GPUs each")
-        print(f"Total GPUs: {num_gpus}, GPUs per replica: {gpus_per_replica}")
-        
-        # Store original CUDA_VISIBLE_DEVICES
-        original_cuda_visible = os.environ.get("CUDA_VISIBLE_DEVICES", None)
-        
-        self.model_replicas = []
-        self.replica_gpu_mappings = []
-        
-        for replica_id in range(num_process):
-            start_gpu = replica_id * gpus_per_replica
-            end_gpu = start_gpu + gpus_per_replica
-            replica_gpus = list(range(start_gpu, end_gpu))
-            self.replica_gpu_mappings.append(replica_gpus)
-            
-            # Set CUDA_VISIBLE_DEVICES to only the GPUs this replica should use
-            # This makes those GPUs appear as cuda:0, cuda:1, etc. to the model
-            cuda_visible_str = ",".join(str(gpu) for gpu in replica_gpus)
-            os.environ["CUDA_VISIBLE_DEVICES"] = cuda_visible_str
-            
-            print(f"Loading model replica {replica_id} on GPUs {replica_gpus} (visible as cuda:0-{gpus_per_replica-1})")
-            
-            # Now load model with device_map="auto" - it will automatically
-            # distribute across the visible GPUs (tensor parallelism)
-            model_kwargs = {"device_map": "auto"}
-            if self.torch_dtype is not None:
-                model_kwargs["torch_dtype"] = self.torch_dtype
-            
-            replica_model = AutoModelForCausalLM.from_pretrained(
-                self.model_name,
-                **model_kwargs
-            )
-            replica_model.eval()
-            self.model_replicas.append(replica_model)
-        
-        # Restore original CUDA_VISIBLE_DEVICES
-        if original_cuda_visible is not None:
-            os.environ["CUDA_VISIBLE_DEVICES"] = original_cuda_visible
-        else:
-            # Remove it if it wasn't set originally
-            if "CUDA_VISIBLE_DEVICES" in os.environ:
-                del os.environ["CUDA_VISIBLE_DEVICES"]
-        
-        # Use first replica as primary model for compatibility
-        self.model = self.model_replicas[0]
-        self.num_process = num_process
-        self._is_loaded = True
-        print(f"Successfully set up {num_process} replicas")
-        print(f"Replica GPU mappings: {self.replica_gpu_mappings}")
 
     def generate(
         self,
@@ -353,15 +331,9 @@ class HuggingFaceBackend(BaseBackend):
         if is_single:
             prompts = [prompts]
 
-        # Use Accelerate if configured
+        # Use Accelerate if configured, otherwise use single model
         if self.use_accelerate and self.accelerator is not None:
             return self._generate_with_accelerate(
-                prompts, max_length, temperature, top_k, top_p, do_sample,
-                stop_strings, return_logits, return_probs, is_single, compute_gradients
-            )
-        # Use replicas if available (set up during load() if num_process is in config)
-        elif self.model_replicas and len(self.model_replicas) > 1:
-            return self._generate_with_replicas(
                 prompts, max_length, temperature, top_k, top_p, do_sample,
                 stop_strings, return_logits, return_probs, is_single, compute_gradients
             )
@@ -371,6 +343,100 @@ class HuggingFaceBackend(BaseBackend):
                 prompts, max_length, temperature, top_k, top_p, do_sample,
                 stop_strings, return_logits, return_probs, is_single, compute_gradients
             )
+
+    def _generate_with_accelerate(
+        self,
+        prompts: List[str],
+        max_length: int,
+        temperature: float,
+        top_k: Optional[int],
+        top_p: Optional[float],
+        do_sample: bool,
+        stop_strings: Optional[List[str]],
+        return_logits: bool,
+        return_probs: bool,
+        is_single: bool,
+        compute_gradients: bool,
+    ) -> Union[str, List[str], Dict[str, Any], List[Dict[str, Any]]]:
+        """Generate using Accelerate-prepared model (hybrid parallelism)."""
+        # Tokenize inputs
+        inputs = self.tokenizer(
+            prompts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+        )
+        
+        # Move inputs to accelerator device
+        inputs = {k: v.to(self.accelerator.device) for k, v in inputs.items()}
+        
+        # Prepare generation kwargs
+        gen_kwargs = {
+            "max_length": max_length,
+            "do_sample": do_sample,
+        }
+        
+        if stop_strings is not None:
+            gen_kwargs["stop_strings"] = stop_strings
+            gen_kwargs["tokenizer"] = self.tokenizer
+        
+        if return_logits or return_probs:
+            gen_kwargs["return_dict_in_generate"] = True
+            gen_kwargs["output_scores"] = True
+        
+        if do_sample:
+            gen_kwargs["temperature"] = temperature
+            if top_k is not None:
+                gen_kwargs["top_k"] = top_k
+            if top_p is not None:
+                gen_kwargs["top_p"] = top_p
+        
+        # Generate
+        if compute_gradients:
+            context_manager = torch.enable_grad()
+        else:
+            context_manager = torch.no_grad()
+        
+        with context_manager:
+            if return_logits or return_probs:
+                outputs = self.model.generate(**inputs, **gen_kwargs)
+                generated_ids = outputs.sequences
+                scores = outputs.scores
+            else:
+                outputs = self.model.generate(**inputs, **gen_kwargs)
+                generated_ids = outputs
+        
+        # Decode outputs (remove input tokens)
+        input_lengths = inputs["input_ids"].shape[1]
+        generated_token_ids = generated_ids[:, input_lengths:]
+        texts = self.tokenizer.batch_decode(generated_token_ids, skip_special_tokens=True)
+        
+        # If not returning logits/probs, return texts
+        if not return_logits and not return_probs:
+            return texts[0] if is_single else texts
+        
+        # Prepare results with logits/probs
+        results = []
+        for i, text in enumerate(texts):
+            result = {"text": text}
+            
+            if return_logits or return_probs:
+                if scores:
+                    batch_logits = torch.stack(scores, dim=1)  # (batch_size, num_tokens, vocab_size)
+                    logits_array = batch_logits[i].cpu().numpy()  # (num_tokens, vocab_size)
+                    
+                    if return_logits:
+                        result["logits"] = logits_array
+                    
+                    if return_probs:
+                        scaled_logits = logits_array / temperature
+                        exp_logits = np.exp(scaled_logits - np.max(scaled_logits, axis=-1, keepdims=True))
+                        probs_array = exp_logits / np.sum(exp_logits, axis=-1, keepdims=True)
+                        result["probs"] = probs_array
+            
+            results.append(result)
+        
+        return results[0] if is_single else results
 
     def _generate_single(
         self,
@@ -478,139 +544,6 @@ class HuggingFaceBackend(BaseBackend):
 
         return results[0] if is_single else results
 
-    def _generate_with_replicas(
-        self,
-        prompts: List[str],
-        max_length: int,
-        temperature: float,
-        top_k: Optional[int],
-        top_p: Optional[float],
-        do_sample: bool,
-        stop_strings: Optional[List[str]],
-        return_logits: bool,
-        return_probs: bool,
-        is_single: bool,
-        compute_gradients: bool,
-    ) -> Union[str, List[str], Dict[str, Any], List[Dict[str, Any]]]:
-        """Generate using multiple replicas (data parallelism)."""
-        batch_size = len(prompts)
-        num_replicas = len(self.model_replicas)
-        replica_batch_size = (batch_size + num_replicas - 1) // num_replicas
-        
-        all_generated_ids = []
-        all_scores = []
-        
-        # Conditionally enable/disable gradients
-        if compute_gradients:
-            context_manager = torch.enable_grad()
-        else:
-            context_manager = torch.no_grad()
-        
-        for replica_id, replica_model in enumerate[Any](self.model_replicas):
-            start_idx = replica_id * replica_batch_size
-            end_idx = min(start_idx + replica_batch_size, batch_size)
-            
-            if start_idx >= batch_size:
-                break
-            
-            replica_prompts = prompts[start_idx:end_idx]
-            
-            # Tokenize for this replica
-            replica_inputs = self.tokenizer(
-                replica_prompts,
-                return_tensors="pt",
-                padding=True,
-                truncation=True,
-            )
-            
-            # Move inputs to the correct device for this replica
-            # When using device_map="auto", check the model's device
-            if hasattr(replica_model, 'hf_device_map'):
-                # Model uses device_map - inputs should go to the first device in the map
-                first_device = next(iter(replica_model.hf_device_map.values()))
-                replica_inputs = {k: v.to(first_device) for k, v in replica_inputs.items()}
-            else:
-                # Fallback: move to cuda:0 (each replica sees its GPUs as cuda:0, cuda:1, etc.)
-                replica_inputs = {k: v.to("cuda:0") for k, v in replica_inputs.items()}
-            
-            # Prepare generation kwargs
-            gen_kwargs = {
-                "max_length": max_length,
-                "do_sample": do_sample,
-            }
-            
-            if stop_strings is not None:
-                gen_kwargs["stop_strings"] = stop_strings
-                gen_kwargs["tokenizer"] = self.tokenizer
-            
-            if return_logits or return_probs:
-                gen_kwargs["return_dict_in_generate"] = True
-                gen_kwargs["output_scores"] = True
-            
-            if do_sample:
-                gen_kwargs["temperature"] = temperature
-                if top_k is not None:
-                    gen_kwargs["top_k"] = top_k
-                if top_p is not None:
-                    gen_kwargs["top_p"] = top_p
-            
-            # Generate on this replica
-            with context_manager:
-                if return_logits or return_probs:
-                    outputs = replica_model.generate(**replica_inputs, **gen_kwargs)
-                    all_generated_ids.append(outputs.sequences.cpu())
-                    if outputs.scores:
-                        all_scores.append([s.cpu() for s in outputs.scores])
-                else:
-                    outputs = replica_model.generate(**replica_inputs, **gen_kwargs)
-                    all_generated_ids.append(outputs.cpu())
-        
-        # Concatenate results from all replicas
-        generated_ids = torch.cat(all_generated_ids, dim=0)
-        
-        # Decode all at once
-        texts = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-        
-        # If not returning logits/probs, return texts
-        if not return_logits and not return_probs:
-            return texts[0] if is_single else texts
-        
-        # Prepare results with logits/probs
-        # Need to properly handle scores from multiple replicas
-        results = []
-        text_idx = 0
-        for replica_id in range(num_replicas):
-            start_idx = replica_id * replica_batch_size
-            end_idx = min(start_idx + replica_batch_size, batch_size)
-            if start_idx >= batch_size:
-                break
-            
-            replica_size = end_idx - start_idx
-            for i in range(replica_size):
-                result = {"text": texts[text_idx]}
-                text_idx += 1
-                
-                if return_logits or return_probs:
-                    # Get logits for this sample
-                    if replica_id < len(all_scores) and all_scores[replica_id]:
-                        replica_scores = all_scores[replica_id]
-                        batch_logits = torch.stack(replica_scores, dim=1)  # (replica_batch_size, num_tokens, vocab_size)
-                        logits_array = batch_logits[i].cpu().numpy()
-                        
-                        if return_logits:
-                            result["logits"] = logits_array
-                        
-                        if return_probs:
-                            # Convert logits to probabilities
-                            scaled_logits = logits_array / temperature
-                            exp_logits = np.exp(scaled_logits - np.max(scaled_logits, axis=-1, keepdims=True))
-                            probs_array = exp_logits / np.sum(exp_logits, axis=-1, keepdims=True)
-                            result["probs"] = probs_array
-                
-                results.append(result)
-        
-        return results[0] if is_single else results
-
     def get_logits(
         self,
         prompts: Union[str, List[str]],
@@ -638,12 +571,9 @@ class HuggingFaceBackend(BaseBackend):
         if len(prompts) != len(responses):
             raise ValueError(f"Number of prompts ({len(prompts)}) must match number of responses ({len(responses)})")
 
-        # Use Accelerate if configured
+        # Use Accelerate if configured, otherwise use single model
         if self.use_accelerate and self.accelerator is not None:
             return self._get_logits_with_accelerate(prompts, responses, is_single, compute_gradients)
-        # Use replicas if available (set up during load() if num_process is in config)
-        elif self.model_replicas and len(self.model_replicas) > 1:
-            return self._get_logits_with_replicas(prompts, responses, is_single, compute_gradients)
         else:
             # Single model path
             return self._get_logits_single(prompts, responses, is_single, compute_gradients)
@@ -787,107 +717,6 @@ class HuggingFaceBackend(BaseBackend):
         if is_single:
             return all_logits[0]  # (response_len, vocab_size)
         return all_logits
-
-    def _get_logits_with_replicas(
-        self,
-        prompts: List[str],
-        responses: List[str],
-        is_single: bool,
-        compute_gradients: bool,
-    ) -> List[np.ndarray]:
-        """Get logits using multiple replicas (data parallelism)."""
-        batch_size = len(prompts)
-        num_replicas = len(self.model_replicas)
-        replica_batch_size = (batch_size + num_replicas - 1) // num_replicas
-        
-        all_logits = []
-        
-        # Conditionally enable/disable gradients
-        if compute_gradients:
-            context_manager = torch.enable_grad()
-        else:
-            context_manager = torch.no_grad()
-        
-        for replica_id, replica_model in enumerate(self.model_replicas):
-            start_idx = replica_id * replica_batch_size
-            end_idx = min(start_idx + replica_batch_size, batch_size)
-            
-            if start_idx >= batch_size:
-                break
-            
-            replica_prompts = prompts[start_idx:end_idx]
-            replica_responses = responses[start_idx:end_idx]
-            
-            # Get logits for this replica's batch
-            replica_logits = self._get_logits_for_batch(
-                replica_model, replica_prompts, replica_responses, compute_gradients, context_manager
-            )
-            all_logits.extend(replica_logits)
-        
-        if is_single:
-            return all_logits[0]
-        return all_logits
-
-    def _get_logits_for_batch(
-        self,
-        model,
-        prompts: List[str],
-        responses: List[str],
-        compute_gradients: bool,
-        context_manager,
-    ) -> List[np.ndarray]:
-        """Get logits for a batch using a specific model replica."""
-        # Concatenate prompts and responses
-        full_texts = [prompt + response for prompt, response in zip(prompts, responses)]
-        
-        # Tokenize full texts
-        full_inputs = self.tokenizer(
-            full_texts,
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-        )
-        
-        # Tokenize prompts separately
-        prompt_inputs = self.tokenizer(
-            prompts,
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-        )
-        prompt_lengths = prompt_inputs["input_ids"].shape[1]
-        
-        # Move inputs to the correct device for this replica
-        # When using device_map="auto", check the model's device
-        if hasattr(model, 'hf_device_map'):
-            # Model uses device_map - inputs should go to the first device in the map
-            first_device = next(iter(model.hf_device_map.values()))
-            full_inputs = {k: v.to(first_device) for k, v in full_inputs.items()}
-            prompt_inputs = {k: v.to(first_device) for k, v in prompt_inputs.items()}
-        else:
-            # Fallback: move to cuda:0 (each replica sees its GPUs as cuda:0, cuda:1, etc.)
-            full_inputs = {k: v.to("cuda:0") for k, v in full_inputs.items()}
-            prompt_inputs = {k: v.to("cuda:0") for k, v in prompt_inputs.items()}
-        
-        # Get logits (device_map handles device placement automatically)
-        with context_manager:
-            outputs = model(**full_inputs)
-            logits = outputs.logits  # (batch_size, seq_len, vocab_size)
-            
-            batch_logits = []
-            for i in range(len(prompts)):
-                prompt_len = (prompt_inputs["input_ids"][i] != self.tokenizer.pad_token_id).sum().item()
-                if self.tokenizer.pad_token_id is None:
-                    prompt_len = prompt_lengths
-                
-                seq_len = (full_inputs["input_ids"][i] != self.tokenizer.pad_token_id).sum().item()
-                if self.tokenizer.pad_token_id is None:
-                    seq_len = full_inputs["input_ids"].shape[1]
-                
-                response_logits = logits[i, prompt_len-1:seq_len-1, :]
-                batch_logits.append(response_logits.cpu().numpy())
-        
-        return batch_logits
 
     def get_tokenizer(self):
         """Get the tokenizer instance."""

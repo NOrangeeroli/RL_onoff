@@ -35,20 +35,60 @@ Samples responses from models given task configurations and datasets.
 - Saves results to output directory
 
 **Usage:**
+
+The script automatically detects the backend configuration and uses the appropriate launch method:
+
+**Option 1: Using the convenience script (Recommended)**
 ```bash
 # Using default config (experiment_config.yaml in same directory)
-python exp/00-sample.py
+bash exp/00-sample.sh
 
 # Using custom config file
+bash exp/00-sample.sh path/to/config.yaml
+```
+
+**Option 2: Direct execution**
+```bash
+# For HuggingFace backend with num_process > 1, use accelerate launch:
+accelerate launch --num_processes=2 exp/00-sample.py
+
+# For other backends or single-process execution, use regular python:
+python exp/00-sample.py
+
+# With custom config:
 python exp/00-sample.py --config path/to/config.yaml
 ```
+
+**How it works:**
+- The convenience script (`00-sample.sh`) automatically:
+  - Parses the config file to detect `backend_type` and `num_process`
+  - If `backend_type == "huggingface"` and `num_process > 1`: Uses `accelerate launch`
+  - Otherwise: Uses regular `python`
+- This ensures the script works correctly regardless of backend type
 
 **Configuration (in `experiment_config.yaml` under `00_sample`):**
 - `task`: Task configuration (template_type, reward_type, format_type) OR `task_config`: path to task config file
 - `dataset`: Dataset configuration (name, split, num_examples)
 - `backend`: Backend configuration (backend_type, model_name, backend_specific)
+  - For HuggingFace with multi-GPU: Set `backend_specific.num_process` to the number of processes
 - `sampling`: Sampling configuration (max_length, temperature, top_k, top_p, do_sample, num_samples, batch_size, seed, stop_strings) OR `sampling_config`: path to sampling config file
 - `output`: Output directory path
+
+**Multi-GPU Setup:**
+
+For HuggingFace backend with multiple GPUs, configure `num_process` in the backend config:
+
+```yaml
+00_sample:
+  backend:
+    backend_type: "huggingface"
+    model_name: "Qwen/Qwen3-8B"
+    backend_specific:
+      num_process: 2  # Number of model replicas (data parallelism)
+      # Each replica uses device_map="auto" for tensor parallelism
+```
+
+When `num_process > 1`, the `00-sample.sh` script will automatically use `accelerate launch` for proper distributed initialization.
 
 **Output:**
 - `exp/00-sample/output/results.json` - All questions, responses, and rewards
@@ -60,6 +100,7 @@ python exp/00-sample.py --config path/to/config.yaml
 - Flexible sampling configuration (can use config file or direct configuration)
 - Progress bars for long-running operations
 - Automatic batch processing
+- Automatic backend detection for proper launch method
 
 **Example Output Structure:**
 ```json
@@ -96,13 +137,36 @@ Extracts token-wise distributions from sampled responses.
 - Saves results in a compact format (NPZ for distributions, JSON for metadata)
 
 **Usage:**
+
+The script automatically detects the backend configuration and uses the appropriate launch method:
+
+**Option 1: Using the convenience script (Recommended)**
 ```bash
 # Using default config (experiment_config.yaml in same directory)
-python exp/01-dist.py
+bash exp/01-dist.sh
 
 # Using custom config file
+bash exp/01-dist.sh path/to/config.yaml
+```
+
+**Option 2: Direct execution**
+```bash
+# For HuggingFace backend with num_process > 1, use accelerate launch:
+accelerate launch --num_processes=2 exp/01-dist.py
+
+# For other backends or single-process execution, use regular python:
+python exp/01-dist.py
+
+# With custom config:
 python exp/01-dist.py --config path/to/config.yaml
 ```
+
+**How it works:**
+- The convenience script (`01-dist.sh`) automatically:
+  - Parses the config file to detect `backend_type` and `num_process`
+  - If `backend_type == "huggingface"` and `num_process > 1`: Uses `accelerate launch`
+  - Otherwise: Uses regular `python`
+- This ensures the script works correctly regardless of backend type
 
 **Configuration (in `experiment_config.yaml` under `01_dist`):**
 - `input`: Input configuration
@@ -123,6 +187,7 @@ python exp/01-dist.py --config path/to/config.yaml
 - Token string extraction (cleaned of special characters like 'Ġ')
 - Progress bars for long-running operations
 - Automatic batch processing
+- Automatic backend detection for proper launch method
 
 **Loading Results:**
 ```python
@@ -294,10 +359,12 @@ The scripts are designed to work together in a pipeline:
 1. **00-sample.py**: Generate responses for a dataset
    - Input: Dataset, task config, backend config, sampling config
    - Output: `exp/00-sample/output/results.json`, `statistics.json`
+   - **Use `bash exp/00-sample.sh` for automatic backend detection**
 
 2. **01-dist.py**: Extract token distributions from responses
    - Input: Results from `00-sample.py`, backend config
    - Output: `exp/01-dist/output/distributions.json`, `distributions.npz`
+   - **Use `bash exp/01-dist.sh` for automatic backend detection**
 
 3. **02-visualize.py**: Visualize distributions interactively
    - Input: Results from `01-dist.py`
@@ -356,6 +423,8 @@ The scripts are designed to work together in a pipeline:
       # Each replica uses device_map="auto" for tensor parallelism
 ```
 
+**Note:** When using `num_process > 1` with HuggingFace backend, the `00-sample.sh` script will automatically use `accelerate launch` for proper distributed initialization.
+
 ## Dependencies
 
 - **00-sample.py**: `rl_onoff.backends`, `rl_onoff.sampling`, `rl_onoff.tasks`, `rl_onoff.utils.dataset`
@@ -369,3 +438,4 @@ The scripts are designed to work together in a pipeline:
 - Progress bars are shown for long-running operations
 - All scripts use the same unified configuration file for consistency
 - Backend configurations should match between `00-sample.py` and `01-dist.py` for consistent tokenization
+- **For `00-sample.py`, use `bash exp/00-sample.sh` to automatically detect the backend and use the correct launch method**
