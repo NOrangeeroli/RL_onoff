@@ -67,8 +67,11 @@ class HuggingFaceBackend(BaseBackend):
         
         self.device_map = hf_config.device_map
         self.tp_size = hf_config.tp_size  # Tensor parallelism size (GPUs per replica)
+        # Get token from config or environment variable (HF_TOKEN is standard)
+        self.token = hf_config.token or os.environ.get('HF_TOKEN')
         
         self.accelerator = None  # Accelerate accelerator instance for parallelism
+        
         self.use_accelerate = False  # Whether to use Accelerate for parallelism
 
     def load(self) -> None:
@@ -78,11 +81,16 @@ class HuggingFaceBackend(BaseBackend):
 
         print(f"Loading HuggingFace model: {self.model_name}")
         
+        # Prepare tokenizer kwargs
+        tokenizer_kwargs = {"padding_side": "left"}
+        if self.token:
+            tokenizer_kwargs["token"] = self.token
+        
         # Load tokenizer
         print("Loading tokenizer...")
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_name,
-            padding_side="left",
+            **tokenizer_kwargs
         )
         
         if self.tokenizer.pad_token is None:
@@ -128,6 +136,10 @@ class HuggingFaceBackend(BaseBackend):
         
         # Prepare model loading kwargs for single model
         model_kwargs = {}
+        
+        # Add token if available
+        if self.token:
+            model_kwargs["token"] = self.token
         
         # Determine device_map: use "auto" if not specified and multiple GPUs available
         if self.device_map is not None:
@@ -243,6 +255,8 @@ class HuggingFaceBackend(BaseBackend):
         model_kwargs = {}
         if self.torch_dtype is not None:
             model_kwargs["torch_dtype"] = self.torch_dtype
+        if self.token:
+            model_kwargs["token"] = self.token
         
         # Load model - Accelerate will handle distribution
         self.model = AutoModelForCausalLM.from_pretrained(

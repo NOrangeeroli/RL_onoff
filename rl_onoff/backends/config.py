@@ -15,6 +15,7 @@ class HuggingFaceBackendConfig(Config):
     torch_dtype: Optional[str] = None  # "float32", "float16", "bfloat16"
     device_map: Optional[str] = None  # "auto", "balanced", etc.
     tp_size: Optional[int] = None  # Tensor parallelism size (number of GPUs per model replica)
+    token: Optional[str] = None  # HuggingFace access token for gated models (or use HF_TOKEN env var)
 
 
 @dataclass
@@ -87,12 +88,13 @@ class BackendConfig(Config):
         # If backend_specific is not present, try to extract from top level (backward compatibility)
         if not backend_specific:
             # For HuggingFace
-            if any(k in data for k in ["device", "torch_dtype", "device_map", "tp_size", "num_process"]):
+            if any(k in data for k in ["device", "torch_dtype", "device_map", "tp_size", "num_process", "token"]):
                 backend_specific = {
                     "device": data.get("device"),
                     "torch_dtype": data.get("torch_dtype"),
                     "device_map": data.get("device_map"),
                     "tp_size": data.get("tp_size") or data.get("num_process"),  # Backward compatibility
+                    "token": data.get("token"),
                 }
             # For vLLM
             elif any(k in data for k in ["tensor_parallel_size", "gpu_memory_utilization", "max_model_len"]):
@@ -116,6 +118,7 @@ class BackendConfig(Config):
                 "torch_dtype": backend_specific.get("torch_dtype"),
                 "device_map": backend_specific.get("device_map"),
                 "tp_size": backend_specific.get("tp_size") or backend_specific.get("num_process"),  # Backward compatibility
+                "token": backend_specific.get("token"),
             })
         elif backend_type == "vllm":
             backend_config = VLLMBackendConfig.from_dict({
