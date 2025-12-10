@@ -59,7 +59,7 @@ class SGLangBackend(BaseBackend):
             return
 
         print(f"Loading SGLang model: {self.model_name}")
-        
+
         load_kwargs = {
             "tp_size": self.tp_size,
             "mem_fraction_static": self.mem_fraction_static,
@@ -129,7 +129,7 @@ class SGLangBackend(BaseBackend):
                 "return_logits and return_probs are not yet supported for SGLang backend. "
                 "Please use HuggingFace backend for this functionality."
             )
-        
+
         # Generate using SGLang
         # Note: SGLang API may vary - this is a simplified version
         outputs = []
@@ -252,5 +252,4 @@ if __name__ == "__main__":
         print(f"Tokenizer: {type(tokenizer).__name__}")
         if hasattr(tokenizer, 'vocab_size'):
             print(f"Vocabulary size: {tokenizer.vocab_size}\n")
-        
-        
+
