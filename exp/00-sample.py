@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Experimental script 00: Sample responses for GSM8K dataset using MathTask.
+"""Experimental script 00: Sample responses for datasets.
 
 This script:
-1. Loads GSM8K Level 1 test dataset
-2. Uses HuggingFace backend with meta-llama/Llama-3.2-1B
-3. Uses default sampling config
-4. Uses MathTask to format questions, generate responses, and evaluate rewards
-5. Saves results to 00-sample/output/
+1. Loads a dataset (configurable via experiment_config.yaml)
+2. Uses a backend (configurable via experiment_config.yaml)
+3. Uses sampling config (configurable via experiment_config.yaml)
+4. Uses a task to format questions, generate responses, and evaluate rewards
+5. Saves results to output directory (configurable via experiment_config.yaml)
 """
 
 import json
@@ -60,10 +60,10 @@ def load_experiment_config(config_path: Optional[str] = None) -> dict:
 def main(
     experiment_config_path: Optional[str] = None
 ):
-    """Main function to sample responses for GSM8K dataset.
+    """Main function to sample responses for a dataset.
     
     Args:
-        experiment_config_path: Path to experiment config file (default: 00-sample_config.yaml)
+        experiment_config_path: Path to experiment config file (default: experiment_config.yaml)
     """
     # Load experiment configuration
     exp_config = load_experiment_config(experiment_config_path)
@@ -73,8 +73,13 @@ def main(
     output_dir = (project_root / output_dir_str).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     
+    # Get dataset name early for display
+    dataset_config = exp_config.get("dataset", {})
+    dataset_name = dataset_config.get("name", "gsm8k_level1")
+    dataset_split = dataset_config.get("split", "test")
+    
     print("=" * 80)
-    print("GSM8K Sampling Experiment")
+    print(f"Sampling Experiment: {dataset_name} ({dataset_split})")
     print("=" * 80)
     
     # Load task config
@@ -109,10 +114,7 @@ def main(
           f"format={task.config.format_type}, "
           f"reward={task.config.reward_type}")
     
-    # Load dataset
-    dataset_config = exp_config.get("dataset", {})
-    dataset_name = dataset_config.get("name", "gsm8k_level1")
-    dataset_split = dataset_config.get("split", "test")
+    # Load dataset (name and split already retrieved above)
     num_examples = dataset_config.get("num_examples")
     
     print(f"\nLoading {dataset_name} {dataset_split} dataset...")
@@ -308,12 +310,12 @@ def main(
 if __name__ == "__main__":
     import argparse
     
-    parser = argparse.ArgumentParser(description="Sample responses for GSM8K dataset")
+    parser = argparse.ArgumentParser(description="Sample responses for a dataset")
     parser.add_argument(
         "--config",
         type=str,
         default=None,
-        help="Path to experiment config file (default: 00-sample_config.yaml)"
+        help="Path to experiment config file (default: experiment_config.yaml)"
     )
     
     args = parser.parse_args()
