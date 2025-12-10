@@ -15,7 +15,7 @@ The HuggingFace backend uses the `transformers` library for inference.
 **Features:**
 - Full PyTorch integration
 - Support for all HuggingFace models
-- Hybrid parallelism: data parallelism + tensor parallelism (via `num_process`)
+- Hybrid parallelism: data parallelism + tensor parallelism (via `tp_size`)
 - Model parallelism via `device_map`
 - Support for logits/probabilities extraction
 - Gradient computation support (for gradient-based analysis)
@@ -150,23 +150,23 @@ backend_specific:
   device: "cuda"  # "cpu", "cuda", "cuda:0", etc. (null = auto-detect)
   torch_dtype: "float16"  # "float32", "float16", "bfloat16" (null = auto)
   device_map: "auto"  # "auto", "balanced", etc. (null = use device)
-  num_process: 2  # Number of model replicas for hybrid parallelism (null = single model)
+  tp_size: 2  # Tensor parallelism size (GPUs per replica). Number of replicas = num_gpus / tp_size
 ```
 
 **Parameters:**
 - `device`: Target device for the model. If `null`, auto-detects CUDA availability.
 - `torch_dtype`: Data type for model weights. Useful for memory efficiency (`float16`, `bfloat16`).
 - `device_map`: Enables model parallelism. Options include `"auto"`, `"balanced"`, or custom mappings. If set, overrides `device`.
-- `num_process`: Number of model replicas for hybrid parallelism (data + tensor parallelism). Each replica uses `device_map="auto"` across its allocated GPUs. If `null`, uses a single model.
+- `tp_size`: Tensor parallelism size (number of GPUs per model replica). Number of replicas is automatically calculated as `num_gpus / tp_size`. If `null` or `1`, uses a single model with all available GPUs for tensor parallelism.
 
 **Multi-GPU Notes:**
-- **Single Model**: If `num_process` is `null` or `1`:
+- **Single Model**: If `tp_size` is `null` or `1`:
   - If `device_map` is not set and multiple GPUs are available, automatically uses `device_map="auto"` for model parallelism (splits layers across GPUs).
   - If `device_map` is explicitly set, uses that strategy.
-- **Hybrid Parallelism**: If `num_process > 1`:
-  - Creates `num_process` model replicas (data parallelism).
-  - Each replica uses `device_map="auto"` across its allocated GPUs (tensor parallelism).
-  - GPUs are divided evenly among replicas (e.g., 4 GPUs with `num_process=2` → 2 GPUs per replica).
+- **Hybrid Parallelism**: If `tp_size > 1`:
+  - Number of replicas = `num_gpus / tp_size` (must be divisible)
+  - Each replica uses `tp_size` GPUs for tensor parallelism (via Accelerate's ParallelismConfig).
+  - Example: 8 GPUs with `tp_size=2` → 4 replicas, each using 2 GPUs.
   - Batches are automatically split across replicas for parallel processing.
 
 ### vLLM Configuration
@@ -406,31 +406,32 @@ backend.load()
 
 ### HuggingFace: Hybrid Parallelism (Data + Tensor Parallelism)
 
-Use `num_process` to enable hybrid parallelism, combining data parallelism (multiple model replicas) with tensor parallelism (layers split across GPUs within each replica):
+Use `tp_size` to enable hybrid parallelism, combining data parallelism (multiple model replicas) with tensor parallelism (layers split across GPUs within each replica):
 
 ```python
-# Example: 4 GPUs, 2 replicas, 2 GPUs per replica
+# Example: 8 GPUs, tp_size=2 → 4 replicas, 2 GPUs per replica
 backend = create_backend({
     "backend_type": "huggingface",
     "model_name": "gpt2",
     "backend_specific": {
-        "num_process": 2  # 2 model replicas
-        # Each replica will use device_map="auto" across its allocated GPUs
+        "tp_size": 2  # Tensor parallelism size (GPUs per replica)
+        # Number of replicas = 8 / 2 = 4
     }
 })
 backend.load()
 # Output:
-# Setting up 2 model replicas with 2 GPUs each
-# Total GPUs: 4, GPUs per replica: 2
-# Loading model replica 0 on GPUs [0, 1] (visible as cuda:0-1)
-# Loading model replica 1 on GPUs [2, 3] (visible as cuda:0-1)
+# Setting up hybrid (data + tensor) using Accelerate
+#   Data parallel shards: 4
+#   Tensor parallel size: 2
+#   Total GPUs: 8
 ```
 
 **How it works:**
-- GPUs are divided evenly among replicas (e.g., 4 GPUs with `num_process=2` → GPUs [0,1] for replica 0, GPUs [2,3] for replica 1)
-- Each replica uses `CUDA_VISIBLE_DEVICES` to see only its allocated GPUs
-- Within each replica, `device_map="auto"` handles tensor parallelism (splits layers across the replica's GPUs)
+- Number of replicas = `num_gpus / tp_size` (must be divisible)
+- Each replica uses `tp_size` GPUs for tensor parallelism (via Accelerate's ParallelismConfig)
+- Example: 8 GPUs with `tp_size=2` → 4 replicas, each using 2 GPUs for tensor parallelism
 - Batches are automatically split across replicas for parallel processing
+- Uses HuggingFace Accelerate with `ParallelismConfig` for efficient hybrid parallelism
 
 **Gradient Computation:**
 
@@ -547,10 +548,10 @@ The configuration system automatically:
 ## Notes
 
 - Backends must be loaded (call `backend.load()`) before generating text
-- HuggingFace backend supports hybrid parallelism (data + tensor parallelism) via `num_process`:
-  - When `num_process > 1`, creates multiple model replicas (data parallelism)
-  - Each replica uses `device_map="auto"` for tensor parallelism across its allocated GPUs
-  - Batches are automatically split across replicas
+- HuggingFace backend supports hybrid parallelism (data + tensor parallelism) via `tp_size`:
+  - When `tp_size > 1`, number of replicas = `num_gpus / tp_size` (data parallelism)
+  - Each replica uses `tp_size` GPUs for tensor parallelism (via Accelerate's ParallelismConfig)
+  - Batches are automatically split across replicas for parallel processing
 - Logits/probabilities extraction is currently only supported by HuggingFace backend
 - Gradient computation (`compute_gradients=True`) may not be fully supported with `device_map="auto"` - consider single GPU mode for gradient-based analysis
 - All backends use left padding for tokenization to support batched inference

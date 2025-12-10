@@ -49,8 +49,9 @@ bash exp/00-sample.sh path/to/config.yaml
 
 **Option 2: Direct execution**
 ```bash
-# For HuggingFace backend with num_process > 1, use accelerate launch:
-accelerate launch --num_processes=2 exp/00-sample.py
+# For HuggingFace backend with tp_size > 1, use accelerate launch:
+# (Number of processes = num_gpus / tp_size)
+accelerate launch --num_processes=4 exp/00-sample.py  # Example: 8 GPUs / tp_size=2 = 4 processes
 
 # For other backends or single-process execution, use regular python:
 python exp/00-sample.py
@@ -61,8 +62,9 @@ python exp/00-sample.py --config path/to/config.yaml
 
 **How it works:**
 - The convenience script (`00-sample.sh`) automatically:
-  - Parses the config file to detect `backend_type` and `num_process`
-  - If `backend_type == "huggingface"` and `num_process > 1`: Uses `accelerate launch`
+  - Parses the config file to detect `backend_type` and `tp_size`
+  - Calculates number of processes: `num_processes = num_gpus / tp_size`
+  - If `backend_type == "huggingface"` and `num_processes > 1`: Uses `accelerate launch`
   - Otherwise: Uses regular `python`
 - This ensures the script works correctly regardless of backend type
 
@@ -70,13 +72,13 @@ python exp/00-sample.py --config path/to/config.yaml
 - `task`: Task configuration (template_type, reward_type, format_type) OR `task_config`: path to task config file
 - `dataset`: Dataset configuration (name, split, num_examples)
 - `backend`: Backend configuration (backend_type, model_name, backend_specific)
-  - For HuggingFace with multi-GPU: Set `backend_specific.num_process` to the number of processes
+  - For HuggingFace with multi-GPU: Set `backend_specific.tp_size` to the tensor parallelism size (GPUs per replica)
 - `sampling`: Sampling configuration (max_length, temperature, top_k, top_p, do_sample, num_samples, batch_size, seed, stop_strings) OR `sampling_config`: path to sampling config file
 - `output`: Output directory path
 
 **Multi-GPU Setup:**
 
-For HuggingFace backend with multiple GPUs, configure `num_process` in the backend config:
+For HuggingFace backend with multiple GPUs, configure `tp_size` in the backend config:
 
 ```yaml
 00_sample:
@@ -84,11 +86,12 @@ For HuggingFace backend with multiple GPUs, configure `num_process` in the backe
     backend_type: "huggingface"
     model_name: "Qwen/Qwen3-8B"
     backend_specific:
-      num_process: 2  # Number of model replicas (data parallelism)
-      # Each replica uses device_map="auto" for tensor parallelism
+      tp_size: 2  # Tensor parallelism size (GPUs per replica)
+      # Number of replicas = num_gpus / tp_size
+      # Example: 8 GPUs with tp_size=2 → 4 replicas (data parallelism)
 ```
 
-When `num_process > 1`, the `00-sample.sh` script will automatically use `accelerate launch` for proper distributed initialization.
+When `tp_size > 1`, the `00-sample.sh` script will automatically calculate the number of processes (`num_gpus / tp_size`) and use `accelerate launch` for proper distributed initialization.
 
 **Output:**
 - `exp/00-sample/output/results.json` - All questions, responses, and rewards
@@ -151,8 +154,9 @@ bash exp/01-dist.sh path/to/config.yaml
 
 **Option 2: Direct execution**
 ```bash
-# For HuggingFace backend with num_process > 1, use accelerate launch:
-accelerate launch --num_processes=2 exp/01-dist.py
+# For HuggingFace backend with tp_size > 1, use accelerate launch:
+# (Number of processes = num_gpus / tp_size)
+accelerate launch --num_processes=4 exp/01-dist.py  # Example: 8 GPUs / tp_size=2 = 4 processes
 
 # For other backends or single-process execution, use regular python:
 python exp/01-dist.py
@@ -163,8 +167,9 @@ python exp/01-dist.py --config path/to/config.yaml
 
 **How it works:**
 - The convenience script (`01-dist.sh`) automatically:
-  - Parses the config file to detect `backend_type` and `num_process`
-  - If `backend_type == "huggingface"` and `num_process > 1`: Uses `accelerate launch`
+  - Parses the config file to detect `backend_type` and `tp_size`
+  - Calculates number of processes: `num_processes = num_gpus / tp_size`
+  - If `backend_type == "huggingface"` and `num_processes > 1`: Uses `accelerate launch`
   - Otherwise: Uses regular `python`
 - This ensures the script works correctly regardless of backend type
 
@@ -419,11 +424,12 @@ The scripts are designed to work together in a pipeline:
     backend_type: "huggingface"
     model_name: "Qwen/Qwen3-8B"
     backend_specific:
-      num_process: 2  # 2 model replicas (data parallelism)
-      # Each replica uses device_map="auto" for tensor parallelism
+      tp_size: 2  # Tensor parallelism size (GPUs per replica)
+      # Number of replicas = num_gpus / tp_size
+      # Example: 8 GPUs with tp_size=2 → 4 replicas (data parallelism)
 ```
 
-**Note:** When using `num_process > 1` with HuggingFace backend, the `00-sample.sh` script will automatically use `accelerate launch` for proper distributed initialization.
+**Note:** When using `tp_size > 1` with HuggingFace backend, the `00-sample.sh` script will automatically calculate the number of processes and use `accelerate launch` for proper distributed initialization.
 
 ## Dependencies
 

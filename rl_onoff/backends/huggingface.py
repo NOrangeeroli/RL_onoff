@@ -66,7 +66,8 @@ class HuggingFaceBackend(BaseBackend):
             self.torch_dtype = None
         
         self.device_map = hf_config.device_map
-        self.num_process = hf_config.num_process  # Number of replicas from config (data parallelism)
+        self.tp_size = hf_config.tp_size  # Tensor parallelism size (GPUs per replica)
+        
         self.accelerator = None  # Accelerate accelerator instance for parallelism
         self.use_accelerate = False  # Whether to use Accelerate for parallelism
 
@@ -90,7 +91,7 @@ class HuggingFaceBackend(BaseBackend):
         # Check if we need parallelism (multi-GPU or multi-process)
         num_gpus = torch.cuda.device_count()
         needs_parallelism = (
-            (self.num_process is not None and self.num_process > 1) or
+            (self.tp_size is not None and self.tp_size > 1) or
             (num_gpus > 1 and (self.device_map == "auto" or self.device_map is None))
         )
         
@@ -102,24 +103,23 @@ class HuggingFaceBackend(BaseBackend):
                 )
             
             # Calculate parallelism parameters
-            if self.num_process is not None and self.num_process > 1:
-                # Multi-process case (data parallel or hybrid)
+            if self.tp_size is not None and self.tp_size > 1:
+                # Tensor parallelism specified - calculate number of replicas
                 if num_gpus == 0:
-                    raise ValueError("CUDA not available. Cannot set up multi-process parallelism.")
-                if self.num_process > num_gpus:
+                    raise ValueError("CUDA not available. Cannot set up multi-GPU parallelism.")
+                if self.tp_size > num_gpus:
                     raise ValueError(
-                        f"num_process ({self.num_process}) cannot exceed number of GPUs ({num_gpus})"
+                        f"tp_size ({self.tp_size}) cannot exceed number of GPUs ({num_gpus})"
                     )
-                gpus_per_replica = num_gpus // self.num_process
-                if gpus_per_replica < 1:
+                if num_gpus % self.tp_size != 0:
                     raise ValueError(
-                        f"Not enough GPUs ({num_gpus}) for {self.num_process} replicas. "
-                        f"Need at least {self.num_process} GPUs."
+                        f"Number of GPUs ({num_gpus}) must be divisible by tp_size ({self.tp_size})"
                     )
-                dp_shard_size = self.num_process
-                tp_size = gpus_per_replica
+                dp_shard_size = num_gpus // self.tp_size  # Number of model replicas
+                tp_size = self.tp_size
             else:
                 # Pure model parallel (single process, multiple GPUs)
+                # Use all GPUs for tensor parallelism, no data parallelism
                 dp_shard_size = 1
                 tp_size = num_gpus
             

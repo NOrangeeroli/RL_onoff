@@ -29,7 +29,7 @@
       device: null
       torch_dtype: null
       device_map: null
-      num_process: 2
+      tp_size: 1  # Tensor parallelism size (GPUs per replica). Number of replicas = num_gpus / tp_size
 
   # Sampling configuration: either specify sampling_config file OR configure directly
   # Option 1: Use a sampling config file (backward compatible)
@@ -65,7 +65,7 @@
       device: null
       torch_dtype: null
       device_map: null
-      num_process: 2
+      tp_size: 1  # Tensor parallelism size (GPUs per replica). Number of replicas = num_gpus / tp_size
 
   distribution:
     use_logits: false  # If true, extract logits; if false, extract probabilities
