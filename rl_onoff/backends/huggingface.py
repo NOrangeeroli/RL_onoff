@@ -447,47 +447,78 @@ class HuggingFaceBackend(BaseBackend):
                     
                     local_results.append(result)
         
-        # Gather results from all processes
+        # Gather results from all processes (TRL-style)
         if world_size > 1:
-            # Use gather_object for Python objects (lists, dicts, strings)
-            # gather_object is a torch.distributed function (PyTorch 1.8+)
-            if hasattr(dist, 'gather_object'):
-                # Only rank 0 needs to provide gather_list, others pass None
-                if rank == 0:
-                    gathered_list = [None] * world_size
-                else:
-                    gathered_list = None
-                
-                dist.gather_object(local_results, gathered_list, dst=0)
-                
-                if rank == 0:
-                    # Flatten the list of lists
-                    gathered_results = []
-                    for proc_results in gathered_list:
-                        if proc_results is not None:
-                            gathered_results.extend(proc_results)
-                else:
-                    gathered_results = None
-            else:
-                # Fallback for older PyTorch versions: serialize and use all_gather
-                import pickle
-                # Serialize local results
-                serialized = pickle.dumps(local_results)
-                serialized_tensor = torch.ByteTensor(list(serialized))
-                # Gather serialized data
-                gathered_tensors = [torch.zeros_like(serialized_tensor) for _ in range(world_size)]
-                dist.all_gather(gathered_tensors, serialized_tensor)
-                if rank == 0:
-                    # Deserialize and flatten
-                    gathered_results = []
-                    for tensor in gathered_tensors:
-                        data = pickle.loads(bytes(tensor.cpu().numpy().tolist()))
-                        if data is not None:
-                            gathered_results.extend(data)
-                else:
+            gathered_results = None
+            
+            # TRL pattern: Try Accelerator's gather_object wrapper first (if available)
+            if hasattr(self.accelerator, 'gather_object'):
+                try:
+                    gathered = self.accelerator.gather_object(local_results)
+                    # gather_object may return on all processes or just main
+                    # Handle different return formats
+                    if self.accelerator.is_main_process:
+                        if isinstance(gathered, list) and len(gathered) > 0:
+                            if isinstance(gathered[0], list):
+                                # Flatten list of lists
+                                gathered_results = []
+                                for proc_results in gathered:
+                                    if proc_results is not None:
+                                        gathered_results.extend(proc_results)
+                            else:
+                                gathered_results = gathered
+                        else:
+                            gathered_results = gathered
+                    else:
+                        gathered_results = None
+                except (AttributeError, TypeError, NotImplementedError):
+                    # Fallback if gather_object doesn't work as expected
                     gathered_results = None
             
-            # Only return results on main process
+            # Fallback to direct dist.gather_object
+            if gathered_results is None:
+                if hasattr(dist, 'gather_object'):
+                    # Only rank 0 needs to provide gather_list, others pass None
+                    if rank == 0:
+                        gathered_list = [None] * world_size
+                    else:
+                        gathered_list = None
+                    
+                    dist.gather_object(local_results, gathered_list, dst=0)
+                    
+                    if rank == 0:
+                        # Flatten the list of lists
+                        gathered_results = []
+                        for proc_results in gathered_list:
+                            if proc_results is not None:
+                                gathered_results.extend(proc_results)
+                    else:
+                        gathered_results = None
+                else:
+                    # Fallback for older PyTorch versions: serialize and use all_gather
+                    import pickle
+                    # Serialize local results
+                    serialized = pickle.dumps(local_results)
+                    serialized_tensor = torch.ByteTensor(list(serialized))
+                    # Gather serialized data
+                    gathered_tensors = [torch.zeros_like(serialized_tensor) for _ in range(world_size)]
+                    dist.all_gather(gathered_tensors, serialized_tensor)
+                    if rank == 0:
+                        # Deserialize and flatten
+                        gathered_results = []
+                        for tensor in gathered_tensors:
+                            data = pickle.loads(bytes(tensor.cpu().numpy().tolist()))
+                            if data is not None:
+                                gathered_results.extend(data)
+                    else:
+                        gathered_results = None
+            
+            # TRL pattern: Synchronize all processes before returning
+            # This ensures all processes finish gathering before main process returns
+            if dist.is_initialized():
+                dist.barrier()
+            
+            # TRL pattern: Only main process returns meaningful results
             if self.accelerator.is_main_process:
                 final_results = gathered_results
             else:
@@ -732,47 +763,78 @@ class HuggingFaceBackend(BaseBackend):
                     response_logits = logits[i, prompt_len-1:seq_len-1, :]
                     local_logits.append(response_logits.cpu().numpy())
         
-        # Gather results from all processes
+        # Gather results from all processes (TRL-style)
         if world_size > 1:
-            # Use gather_object for Python objects (lists of numpy arrays)
-            # gather_object is a torch.distributed function (PyTorch 1.8+)
-            if hasattr(dist, 'gather_object'):
-                # Only rank 0 needs to provide gather_list, others pass None
-                if rank == 0:
-                    gathered_list = [None] * world_size
-                else:
-                    gathered_list = None
-                
-                dist.gather_object(local_logits, gathered_list, dst=0)
-                
-                if rank == 0:
-                    # Flatten the list of lists
-                    gathered_logits = []
-                    for proc_logits in gathered_list:
-                        if proc_logits is not None:
-                            gathered_logits.extend(proc_logits)
-                else:
-                    gathered_logits = None
-            else:
-                # Fallback for older PyTorch versions: serialize and use all_gather
-                import pickle
-                # Serialize local logits
-                serialized = pickle.dumps(local_logits)
-                serialized_tensor = torch.ByteTensor(list(serialized))
-                # Gather serialized data
-                gathered_tensors = [torch.zeros_like(serialized_tensor) for _ in range(world_size)]
-                dist.all_gather(gathered_tensors, serialized_tensor)
-                if rank == 0:
-                    # Deserialize and flatten
-                    gathered_logits = []
-                    for tensor in gathered_tensors:
-                        data = pickle.loads(bytes(tensor.cpu().numpy().tolist()))
-                        if data is not None:
-                            gathered_logits.extend(data)
-                else:
+            gathered_logits = None
+            
+            # TRL pattern: Try Accelerator's gather_object wrapper first (if available)
+            if hasattr(self.accelerator, 'gather_object'):
+                try:
+                    gathered = self.accelerator.gather_object(local_logits)
+                    # gather_object may return on all processes or just main
+                    # Handle different return formats
+                    if self.accelerator.is_main_process:
+                        if isinstance(gathered, list) and len(gathered) > 0:
+                            if isinstance(gathered[0], list):
+                                # Flatten list of lists
+                                gathered_logits = []
+                                for proc_logits in gathered:
+                                    if proc_logits is not None:
+                                        gathered_logits.extend(proc_logits)
+                            else:
+                                gathered_logits = gathered
+                        else:
+                            gathered_logits = gathered
+                    else:
+                        gathered_logits = None
+                except (AttributeError, TypeError, NotImplementedError):
+                    # Fallback if gather_object doesn't work as expected
                     gathered_logits = None
             
-            # Only return results on main process
+            # Fallback to direct dist.gather_object
+            if gathered_logits is None:
+                if hasattr(dist, 'gather_object'):
+                    # Only rank 0 needs to provide gather_list, others pass None
+                    if rank == 0:
+                        gathered_list = [None] * world_size
+                    else:
+                        gathered_list = None
+                    
+                    dist.gather_object(local_logits, gathered_list, dst=0)
+                    
+                    if rank == 0:
+                        # Flatten the list of lists
+                        gathered_logits = []
+                        for proc_logits in gathered_list:
+                            if proc_logits is not None:
+                                gathered_logits.extend(proc_logits)
+                    else:
+                        gathered_logits = None
+                else:
+                    # Fallback for older PyTorch versions: serialize and use all_gather
+                    import pickle
+                    # Serialize local logits
+                    serialized = pickle.dumps(local_logits)
+                    serialized_tensor = torch.ByteTensor(list(serialized))
+                    # Gather serialized data
+                    gathered_tensors = [torch.zeros_like(serialized_tensor) for _ in range(world_size)]
+                    dist.all_gather(gathered_tensors, serialized_tensor)
+                    if rank == 0:
+                        # Deserialize and flatten
+                        gathered_logits = []
+                        for tensor in gathered_tensors:
+                            data = pickle.loads(bytes(tensor.cpu().numpy().tolist()))
+                            if data is not None:
+                                gathered_logits.extend(data)
+                    else:
+                        gathered_logits = None
+            
+            # TRL pattern: Synchronize all processes before returning
+            # This ensures all processes finish gathering before main process returns
+            if dist.is_initialized():
+                dist.barrier()
+            
+            # TRL pattern: Only main process returns meaningful results
             if self.accelerator.is_main_process:
                 all_logits = gathered_logits
             else:
