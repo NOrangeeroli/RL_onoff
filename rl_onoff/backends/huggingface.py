@@ -98,41 +98,39 @@ class HuggingFaceBackend(BaseBackend):
 
         # Check if we need parallelism (multi-GPU or multi-process)
         num_gpus = torch.cuda.device_count()
-        needs_parallelism = (
-            (self.tp_size is not None and self.tp_size > 1) or
-            (num_gpus > 1 and (self.device_map == "auto" or self.device_map is None))
-        )
         
-        if needs_parallelism:
+        # Calculate parallelism parameters if tp_size is specified
+        dp_shard_size = None
+        tp_size = None
+        if self.tp_size is not None and self.tp_size > 1:
+            # Tensor parallelism specified - calculate number of replicas
+            if num_gpus == 0:
+                raise ValueError("CUDA not available. Cannot set up multi-GPU parallelism.")
+            if self.tp_size > num_gpus:
+                raise ValueError(
+                    f"tp_size ({self.tp_size}) cannot exceed number of GPUs ({num_gpus})"
+                )
+            if num_gpus % self.tp_size != 0:
+                raise ValueError(
+                    f"Number of GPUs ({num_gpus}) must be divisible by tp_size ({self.tp_size})"
+                )
+            dp_shard_size = num_gpus // self.tp_size  # Number of model replicas
+            tp_size = self.tp_size
+        
+        # Use Accelerate only for multi-process data parallelism (dp_shard_size > 1)
+        # For single-process tensor parallelism (dp_shard_size = 1), use device_map="auto"
+        if dp_shard_size is not None and dp_shard_size > 1:
             if not ACCELERATE_AVAILABLE:
                 raise ImportError(
-                    "accelerate is required for multi-GPU/multi-process parallelism. "
+                    "accelerate is required for multi-process data parallelism. "
                     "Install it with: pip install accelerate"
                 )
-            
-            # Calculate parallelism parameters
-            if self.tp_size is not None and self.tp_size > 1:
-                # Tensor parallelism specified - calculate number of replicas
-                if num_gpus == 0:
-                    raise ValueError("CUDA not available. Cannot set up multi-GPU parallelism.")
-                if self.tp_size > num_gpus:
-                    raise ValueError(
-                        f"tp_size ({self.tp_size}) cannot exceed number of GPUs ({num_gpus})"
-                    )
-                if num_gpus % self.tp_size != 0:
-                    raise ValueError(
-                        f"Number of GPUs ({num_gpus}) must be divisible by tp_size ({self.tp_size})"
-                    )
-                dp_shard_size = num_gpus // self.tp_size  # Number of model replicas
-                tp_size = self.tp_size
-            else:
-                # Pure model parallel (single process, multiple GPUs)
-                # Use all GPUs for tensor parallelism, no data parallelism
-                dp_shard_size = 1
-                tp_size = num_gpus
-            
             self._setup_with_accelerate(dp_shard_size, tp_size)
             return
+        elif dp_shard_size == 1 and tp_size > 1:
+            # Single-process tensor parallelism: use device_map="auto"
+            print(f"Using device_map='auto' for single-process tensor parallelism (tp_size={tp_size})")
+            # Fall through to regular model loading with device_map="auto"
         
         # Prepare model loading kwargs for single model
         model_kwargs = {}
@@ -141,8 +139,12 @@ class HuggingFaceBackend(BaseBackend):
         if self.token:
             model_kwargs["token"] = self.token
         
-        # Determine device_map: use "auto" if not specified and multiple GPUs available
-        if self.device_map is not None:
+        # Determine device_map
+        # If we have single-process tensor parallelism (tp_size > 1, dp_shard_size = 1),
+        # we already printed a message above, so use "auto"
+        if dp_shard_size == 1 and tp_size is not None and tp_size > 1:
+            model_kwargs["device_map"] = "auto"
+        elif self.device_map is not None:
             model_kwargs["device_map"] = self.device_map
             print(f"Using device_map: {self.device_map}")
         elif torch.cuda.device_count() > 1:
