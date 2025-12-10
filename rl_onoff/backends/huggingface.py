@@ -491,8 +491,9 @@ class HuggingFaceBackend(BaseBackend):
             if self.accelerator.is_main_process:
                 final_results = gathered_results
             else:
-                # Non-main processes return None
-                return None if not is_single else None
+                # Non-main processes return empty list to avoid errors in sampler
+                # (results are only used from main process anyway)
+                return [] if not is_single else None
         else:
             # Single process - no gathering needed
             final_results = local_results
@@ -775,8 +776,8 @@ class HuggingFaceBackend(BaseBackend):
             if self.accelerator.is_main_process:
                 all_logits = gathered_logits
             else:
-                # Non-main processes return None
-                return None if not is_single else None
+                # Non-main processes return empty list to avoid errors
+                return [] if not is_single else None
         else:
             # Single process - no gathering needed
             all_logits = local_logits
