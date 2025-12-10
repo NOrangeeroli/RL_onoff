@@ -1,5 +1,6 @@
 """Backend implementations for different LLM inference engines."""
 
+from typing import Union, Dict, Any
 from rl_onoff.backends.base import BaseBackend
 from rl_onoff.backends.huggingface import HuggingFaceBackend
 from rl_onoff.backends.vllm import VLLMBackend
@@ -16,30 +17,54 @@ __all__ = [
 ]
 
 
-def create_backend(config: 'BackendConfig'):
-    """Get a backend instance from a BackendConfig.
+def create_backend(config: Union['BackendConfig', Dict[str, Any]]):
+    """Create a backend instance from config.
     
     Args:
-        config: BackendConfig instance
+        config: BackendConfig instance or dict with backend configuration.
+                If dict, must include 'backend_type' and 'model_name'.
+                Backend-specific parameters should be under 'backend_specific' key.
     
     Returns:
         Backend instance
-    """
-    backend_type = config.backend_type
     
+    Examples:
+        >>> # From dict (simplest for exp scripts)
+        >>> backend = create_backend({
+        ...     "backend_type": "huggingface",
+        ...     "model_name": "gpt2",
+        ...     "backend_specific": {"device": "cuda"}
+        ... })
+        
+        >>> # From BackendConfig (for programmatic use)
+        >>> config = BackendConfig.from_dict({"backend_type": "vllm", "model_name": "gpt2"})
+        >>> backend = create_backend(config)
+    """
+    from typing import Union, Dict, Any
+    
+    # Convert dict to BackendConfig if needed
+    if isinstance(config, dict):
+        config = BackendConfig.from_dict(config)
+    elif not isinstance(config, BackendConfig):
+        raise TypeError(
+            f"config must be BackendConfig or dict, got {type(config)}"
+        )
+    
+    # Get backend class based on type
+    backend_type = config.backend_type
     backend_map = {
         "huggingface": HuggingFaceBackend,
         "vllm": VLLMBackend,
         "sglang": SGLangBackend,
     }
     
-    if backend_type.lower() not in backend_map:
+    if backend_type not in backend_map:
         raise ValueError(
             f"Unknown backend type: {backend_type}. "
             f"Supported: {list(backend_map.keys())}"
         )
     
-    return backend_map[backend_type.lower()](config)
+    return backend_map[backend_type](config)
 
 
 if __name__ == "__main__":

@@ -1,12 +1,14 @@
 """Chat templates for formatting conversations."""
 
 from rl_onoff.tasks.chat_templates.base import BaseChatTemplate
+from rl_onoff.tasks.chat_templates.simple import SimpleChatTemplate
 from rl_onoff.tasks.chat_templates.openai import OpenAIChatTemplate
 from rl_onoff.tasks.chat_templates.llama import LlamaChatTemplate
 from rl_onoff.tasks.chat_templates.chatml import ChatMLTemplate
 
 # Registry mapping string names to chat template classes
 CHAT_TEMPLATE_REGISTRY = {
+    "simple": SimpleChatTemplate,
     "openai": OpenAIChatTemplate,
     "llama": LlamaChatTemplate,
     "chatml": ChatMLTemplate,
@@ -17,9 +19,9 @@ def create_chat_template(config: dict) -> BaseChatTemplate:
     """Create a chat template instance from a config dict.
     
     Args:
-        config: Dictionary with 'name' key and optional 'kwargs' key
-                Example: {"name": "openai", "kwargs": {...}}
-                Or: {"name": "simple"}
+        config: Dictionary with 'name' key
+                Example: {"name": "openai"}
+                Note: Chat templates don't take any initialization parameters
         
     Returns:
         Chat template instance
@@ -40,12 +42,13 @@ def create_chat_template(config: dict) -> BaseChatTemplate:
             f"Available: {list(CHAT_TEMPLATE_REGISTRY.keys())}"
         )
     
-    kwargs = config.get("kwargs", {})
-    return CHAT_TEMPLATE_REGISTRY[name](**kwargs)
+    # Chat templates don't take any initialization parameters
+    return CHAT_TEMPLATE_REGISTRY[name]()
 
 
 __all__ = [
     "BaseChatTemplate",
+    "SimpleChatTemplate",
     "OpenAIChatTemplate",
     "LlamaChatTemplate",
     "ChatMLTemplate",

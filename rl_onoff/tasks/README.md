@@ -5,62 +5,68 @@ The tasks module provides a framework for defining task-specific prompt template
 ## Overview
 
 Each task combines:
-- **Prompt Template**: Formats questions into prompts for the model
+- **Chat Template**: Formats questions into prompts for the model
+- **Format**: Defines response structure and extraction logic
 - **Reward**: Evaluates model responses against reference answers
 
 ## Usage Example
 
-### Math Task
+### Creating a Task
 
 ```python
-from rl_onoff.tasks import MathTask
-from rl_onoff.backends import get_backend
-from rl_onoff.sampling import Sampler, SamplingConfig
+from rl_onoff.tasks import create_task
+from rl_onoff.backends import create_backend
+from rl_onoff.sampling import Sampler
+from rl_onoff.sampling.config import SamplingConfig
 
-# Initialize task
-math_task = MathTask()
+# Create task from config file or dict
+task = create_task({
+    "template_type": "simple",
+    "reward_type": "math_verify",
+    "format_type": "boxed"
+})
 
-# Format a prompt from a question
+# Format a query from a question
 question = "What is 2 + 2?"
-prompt = math_task.format_prompt(question)
-# Returns: "Solve the following math problem step by step. Show your work and provide the final answer.\n\nProblem: What is 2 + 2?\n\nSolution:"
+prompt = task.format_query(question)
 
 # Generate response
-backend = get_backend("huggingface", model_name="gpt2")
+backend = create_backend({"backend_type": "huggingface", "model_name": "gpt2"})
 backend.load()
 sampler = Sampler(backend)
-response = sampler.sample([prompt], config=SamplingConfig(max_length=50))[0]
+config = SamplingConfig(max_length=50)
+response = sampler.sample([prompt], config=config)[0]
 
 # Evaluate response
 reference = "4"
-score = math_task.evaluate(response, reference)
+score = task.evaluate(response, reference)
 # Returns: 1.0 if mathematically equivalent, 0.0 otherwise
 ```
 
-### Custom Prompt Template
+### Using a Config File
 
 ```python
-# Use a custom prompt template
-custom_template = "Answer this math question: $question\n\nYour answer:"
-math_task = MathTask(prompt_template=custom_template)
+from rl_onoff.tasks import create_task
 
-prompt = math_task.format_prompt("What is 3 * 4?")
-# Returns: "Answer this math question: What is 3 * 4?\n\nYour answer:"
+# Create task from config file
+task = create_task("rl_onoff/tasks/configs/math_default.yaml")
+
+# Use the task
+question = "What is 3 * 4?"
+prompt = task.format_query(question)
 ```
 
-## Creating New Tasks
-
-To create a new task, inherit from `BaseTask`:
+### Using TaskConfig
 
 ```python
-from rl_onoff.tasks.base import BaseTask
-from rl_onoff.tasks.rewards.builtin import ExactMatchReward
+from rl_onoff.tasks import create_task, TaskConfig
 
-class MyTask(BaseTask):
-    def _create_reward(self):
-        return ExactMatchReward()
-    
-    def get_prompt_template(self):
-        return "Question: $question\nAnswer:"
+# Create TaskConfig explicitly
+config = TaskConfig(
+    template_type="simple",
+    reward_type="math_verify",
+    format_type="boxed"
+)
+task = create_task(config)
 ```
 

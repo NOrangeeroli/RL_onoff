@@ -121,10 +121,14 @@ result = format.extract(response)
 Tasks use formats to define their response structure:
 
 ```python
-from rl_onoff.tasks import MathTask
+from rl_onoff.tasks import create_task
 
 # Create task (uses format from config)
-task = MathTask()
+task = create_task({
+    "template_type": "simple",
+    "reward_type": "math_verify",
+    "format_type": "boxed"
+})
 
 # Format a query (uses format.format_message internally)
 question = "What is 2 + 2?"

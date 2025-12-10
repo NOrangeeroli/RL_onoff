@@ -19,20 +19,18 @@ class ChatMLTemplate(BaseChatTemplate):
     def format(
         self,
         messages: List[Dict[str, str]],
-        **kwargs
+        add_generation_prompt: bool = True,
     ) -> str:
         """Format messages in ChatML style.
         
         Args:
             messages: List of message dicts with 'role' and 'content'
             add_generation_prompt: If True, add assistant prompt at the end
-            **kwargs: Additional formatting options
             
         Returns:
             Formatted prompt string with ChatML tags
         """
         parts = []
-        add_generation_prompt = True
         for msg in messages:
             role = msg.get("role", "user")
             content = msg.get("content", "")

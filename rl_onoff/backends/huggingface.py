@@ -28,27 +28,32 @@ class HuggingFaceBackend(BaseBackend):
         if config.backend_type != "huggingface":
             raise ValueError(f"BackendConfig backend_type must be 'huggingface', got '{config.backend_type}'")
         
+        from rl_onoff.backends.config import HuggingFaceBackendConfig
+        
+        if not isinstance(config.backend_config, HuggingFaceBackendConfig):
+            raise TypeError("config.backend_config must be HuggingFaceBackendConfig")
+        
         super().__init__(config.model_name)
         
-        # Extract HuggingFace-specific parameters from config
-        self.device = config.device or ("cuda" if torch.cuda.is_available() else "cpu")
+        # Extract HuggingFace-specific parameters from nested config
+        hf_config = config.backend_config
+        self.device = hf_config.device or ("cuda" if torch.cuda.is_available() else "cpu")
         
         # Convert torch_dtype from string if needed
-        if config.torch_dtype is not None:
-            if isinstance(config.torch_dtype, str):
+        if hf_config.torch_dtype is not None:
+            if isinstance(hf_config.torch_dtype, str):
                 dtype_map = {
                     "float32": torch.float32,
                     "float16": torch.float16,
                     "bfloat16": torch.bfloat16,
                 }
-                self.torch_dtype = dtype_map.get(config.torch_dtype, config.torch_dtype)
+                self.torch_dtype = dtype_map.get(hf_config.torch_dtype, hf_config.torch_dtype)
             else:
-                self.torch_dtype = config.torch_dtype
+                self.torch_dtype = hf_config.torch_dtype
         else:
             self.torch_dtype = None
         
-        self.device_map = config.device_map
-        self.model_kwargs = config.backend_kwargs or {}
+        self.device_map = hf_config.device_map
 
     def load(self) -> None:
         """Load the HuggingFace model and tokenizer."""
@@ -57,15 +62,11 @@ class HuggingFaceBackend(BaseBackend):
 
         print(f"Loading HuggingFace model: {self.model_name}")
         
-        # Merge initialization kwargs with load kwargs
-        load_kwargs = {**self.model_kwargs}
-        
         # Load tokenizer
         print("Loading tokenizer...")
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_name,
             padding_side="left",
-            **{k: v for k, v in load_kwargs.items() if k not in ["device_map", "torch_dtype"]}
         )
         
         if self.tokenizer.pad_token is None:
@@ -76,26 +77,19 @@ class HuggingFaceBackend(BaseBackend):
         if self.device_map is not None:
             model_kwargs["device_map"] = self.device_map
             print(f"Using device_map: {self.device_map}")
-        elif "device_map" in load_kwargs:
-            model_kwargs["device_map"] = load_kwargs["device_map"]
-            print(f"Using device_map: {load_kwargs['device_map']}")
         else:
-            model_kwargs["device_map"] = self.device
+            # Will set device manually after loading
             print(f"Using device: {self.device}")
 
         if self.torch_dtype is not None:
             model_kwargs["torch_dtype"] = self.torch_dtype
             print(f"Using torch_dtype: {self.torch_dtype}")
-        elif "torch_dtype" in load_kwargs:
-            model_kwargs["torch_dtype"] = load_kwargs["torch_dtype"]
-            print(f"Using torch_dtype: {load_kwargs['torch_dtype']}")
 
         # Load model
         print("Loading model...")
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_name,
-            **model_kwargs,
-            **{k: v for k, v in load_kwargs.items() if k not in ["device_map", "torch_dtype"]}
+            **model_kwargs
         )
         
         # If not using device_map, move model to device
@@ -237,7 +231,6 @@ class HuggingFaceBackend(BaseBackend):
         self,
         prompts: Union[str, List[str]],
         responses: Union[str, List[str]],
-        **kwargs
     ) -> Union[np.ndarray, List[np.ndarray]]:
         """Get token logits for predicting response tokens given prompts."""
         if not self._is_loaded:

@@ -18,21 +18,20 @@ class LlamaChatTemplate(BaseChatTemplate):
 
     def format(
         self,
-        messages: List[Dict[str, str]],        **kwargs
+        messages: List[Dict[str, str]],
+        add_generation_prompt: bool = True,
     ) -> str:
         """Format messages in Llama style.
         
         Args:
             messages: List of message dicts with 'role' and 'content'
             add_generation_prompt: If True, add assistant prompt at the end
-            **kwargs: Additional formatting options
             
         Returns:
             Formatted prompt string with Llama tokens
         """
         parts = []
         has_system = False
-        add_generation_prompt = True
         
         for msg in messages:
             role = msg.get("role", "user")

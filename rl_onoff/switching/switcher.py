@@ -51,7 +51,6 @@ class ModelSwitcher:
         top_p: Optional[float] = None,
         do_sample: bool = True,
         return_switch_points: bool = False,
-        **kwargs
     ) -> Union[str, Tuple[str, List[Dict]]]:
         """Generate response with conditional model switching.
         
@@ -63,7 +62,6 @@ class ModelSwitcher:
             top_p: Top-p sampling parameter
             do_sample: Whether to use sampling
             return_switch_points: Whether to return switch point information
-            **kwargs: Additional generation arguments
             
         Returns:
             Generated text, optionally with switch points info
@@ -144,12 +142,11 @@ class ModelSwitcher:
                 # Generate next token using current model
                 next_token_text = current_backend.generate(
                     current_text,
-                    max_new_tokens=1,
+                    max_length=len(current_text.split()) + 1,  # Approximate: generate 1 more token
                     temperature=temperature,
                     top_k=top_k,
                     top_p=top_p,
                     do_sample=do_sample,
-                    **kwargs
                 )
                 
                 # Extract just the new token (remove the prompt part)
@@ -163,12 +160,11 @@ class ModelSwitcher:
                 print(f"Warning: Error during generation step {step}: {e}")
                 next_token_text = current_backend.generate(
                     current_text,
-                    max_new_tokens=1,
+                    max_length=len(current_text.split()) + 1,  # Approximate: generate 1 more token
                     temperature=temperature,
                     top_k=top_k,
                     top_p=top_p,
                     do_sample=do_sample,
-                    **kwargs
                 )
                 new_token = next_token_text[len(current_text):]
                 generated_tokens.append(new_token)
@@ -189,7 +185,6 @@ class ModelSwitcher:
         top_p: Optional[float] = None,
         do_sample: bool = True,
         return_switch_points: bool = False,
-        **kwargs
     ) -> Union[List[str], List[Tuple[str, List[Dict]]]]:
         """Generate responses for multiple questions with switching.
         
@@ -201,7 +196,6 @@ class ModelSwitcher:
             top_p: Top-p sampling parameter
             do_sample: Whether to use sampling
             return_switch_points: Whether to return switch point information
-            **kwargs: Additional generation arguments
             
         Returns:
             List of generated texts, optionally with switch points
@@ -217,7 +211,6 @@ class ModelSwitcher:
                 top_p=top_p,
                 do_sample=do_sample,
                 return_switch_points=return_switch_points,
-                **kwargs
             )
             results.append(result)
         

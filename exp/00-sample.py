@@ -22,7 +22,6 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from rl_onoff.backends import create_backend
-from rl_onoff.backends.config import BackendConfig
 from rl_onoff.sampling import Sampler
 from rl_onoff.sampling.config import SamplingConfig
 from rl_onoff.tasks import create_task
@@ -134,12 +133,8 @@ def main(
     # Initialize backend
     backend_config_dict = exp_config.get("backend", {})
     print("\nInitializing backend...")
-    backend_config = BackendConfig(
-        backend_type=backend_config_dict.get("backend_type", "huggingface"),
-        model_name=backend_config_dict.get("model_name", "meta-llama/Llama-3.2-3B"),
-        **backend_config_dict.get("backend_kwargs", {})
-    )
-    backend = create_backend(backend_config)
+    # Just pass the dict directly - create_backend handles everything!
+    backend = create_backend(backend_config_dict)
     backend.load()
     print("Backend loaded successfully!")
     
@@ -251,10 +246,14 @@ def main(
     accuracy_rate = num_correct / total_samples if total_samples > 0 else 0.0
     avg_length = total_length / total_samples if total_samples > 0 else 0.0
     
+    # Get backend info from the dict
+    backend_type_str = backend_config_dict.get("backend_type", "huggingface")
+    backend_model_name = backend_config_dict.get("model_name", "unknown")
+    
     statistics = {
         "dataset": f"{dataset_name} ({dataset_split})",
-        "model": backend_config.model_name,
-        "backend": backend_config.backend_type,
+        "model": backend_model_name,
+        "backend": backend_type_str,
         "task_config_path": str(task_config_path),
         "num_examples": len(all_results),
         "num_samples_per_example": sampling_config.num_samples,

@@ -8,12 +8,11 @@ import numpy as np
 class BaseBackend(ABC):
     """Abstract base class for all model backends."""
 
-    def __init__(self, model_name: str, **kwargs):
+    def __init__(self, model_name: str):
         """Initialize the backend.
         
         Args:
             model_name: Name or path of the model to load
-            **kwargs: Additional backend-specific arguments
         """
         self.model_name = model_name
         self.model = None
@@ -21,12 +20,8 @@ class BaseBackend(ABC):
         self._is_loaded = False
 
     @abstractmethod
-    def load(self, **kwargs) -> None:
-        """Load the model and tokenizer.
-        
-        Args:
-            **kwargs: Additional loading arguments
-        """
+    def load(self) -> None:
+        """Load the model and tokenizer."""
         pass
 
     @abstractmethod
@@ -41,7 +36,6 @@ class BaseBackend(ABC):
         stop_strings: Optional[List[str]] = None,
         return_logits: bool = False,
         return_probs: bool = False,
-        **kwargs
     ) -> Union[str, List[str], Dict[str, Any], List[Dict[str, Any]]]:
         """Generate text from prompts.
         
@@ -55,7 +49,6 @@ class BaseBackend(ABC):
             stop_strings: List of strings that will stop generation when encountered
             return_logits: If True, return logits along with generated text
             return_probs: If True, return probabilities along with generated text
-            **kwargs: Additional generation arguments
             
         Returns:
             If return_logits=False and return_probs=False:
@@ -73,14 +66,12 @@ class BaseBackend(ABC):
         self,
         prompts: Union[str, List[str]],
         responses: Union[str, List[str]],
-        **kwargs
     ) -> Union[np.ndarray, List[np.ndarray]]:
         """Get token logits for predicting response tokens given prompts.
         
         Args:
             prompts: Single prompt or list of prompts
             responses: Single response or list of responses to get logits for
-            **kwargs: Additional arguments
             
         Returns:
             Logits array(s) with shape (batch_size, response_len, vocab_size) or
@@ -94,7 +85,6 @@ class BaseBackend(ABC):
         prompts: Union[str, List[str]],
         responses: Union[str, List[str]],
         temperature: float = 1.0,
-        **kwargs
     ) -> Union[np.ndarray, List[np.ndarray]]:
         """Get token probability distributions for predicting response tokens given prompts.
         
@@ -102,14 +92,13 @@ class BaseBackend(ABC):
             prompts: Single prompt or list of prompts
             responses: Single response or list of responses to get probabilities for
             temperature: Temperature for softmax normalization
-            **kwargs: Additional arguments
             
         Returns:
             Probability array(s) with shape (batch_size, response_len, vocab_size) or
             list of arrays with shape (response_len, vocab_size)
             where response_len is the number of tokens in the response
         """
-        logits = self.get_logits(prompts, responses, **kwargs)
+        logits = self.get_logits(prompts, responses)
         
         # Apply temperature and softmax
         if isinstance(logits, list):

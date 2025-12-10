@@ -39,15 +39,20 @@ class VLLMBackend(BaseBackend):
                 "vLLM is not installed. Install it with: pip install vllm"
             )
         
+        from rl_onoff.backends.config import VLLMBackendConfig
+        
+        if not isinstance(config.backend_config, VLLMBackendConfig):
+            raise TypeError("config.backend_config must be VLLMBackendConfig")
+        
         super().__init__(config.model_name)
         
-        # Extract vLLM-specific parameters from config
-        self.tensor_parallel_size = config.tensor_parallel_size or 1
-        self.gpu_memory_utilization = config.gpu_memory_utilization or 0.9
-        self.max_model_len = config.max_model_len
-        self.vllm_kwargs = config.backend_kwargs or {}
+        # Extract vLLM-specific parameters from nested config
+        vllm_config = config.backend_config
+        self.tensor_parallel_size = vllm_config.tensor_parallel_size or 1
+        self.gpu_memory_utilization = vllm_config.gpu_memory_utilization or 0.9
+        self.max_model_len = vllm_config.max_model_len
 
-    def load(self, **kwargs) -> None:
+    def load(self) -> None:
         """Load the vLLM model."""
         if self._is_loaded:
             return
@@ -57,13 +62,11 @@ class VLLMBackend(BaseBackend):
         load_kwargs = {
             "tensor_parallel_size": self.tensor_parallel_size,
             "gpu_memory_utilization": self.gpu_memory_utilization,
-            **self.vllm_kwargs,
-            **kwargs
         }
         
         if self.max_model_len is not None:
             load_kwargs["max_model_len"] = self.max_model_len
-
+        
         print(f"Configuration:")
         print(f"  Tensor parallel size: {self.tensor_parallel_size}")
         print(f"  GPU memory utilization: {self.gpu_memory_utilization}")
@@ -88,7 +91,6 @@ class VLLMBackend(BaseBackend):
         stop_strings: Optional[List[str]] = None,
         return_logits: bool = False,
         return_probs: bool = False,
-        **kwargs
     ) -> Union[str, List[str], Dict[str, Any], List[Dict[str, Any]]]:
         """Generate text from prompts."""
         if not self._is_loaded:
@@ -110,8 +112,6 @@ class VLLMBackend(BaseBackend):
         if stop_strings is not None:
             sampling_params_kwargs["stop"] = stop_strings
         
-        # Merge with additional kwargs (kwargs override)
-        sampling_params_kwargs.update(kwargs)
         sampling_params = SamplingParams(**sampling_params_kwargs)
 
         # Check if logits/probs are requested (not yet supported for vLLM)
@@ -133,7 +133,6 @@ class VLLMBackend(BaseBackend):
         self,
         prompts: Union[str, List[str]],
         responses: Union[str, List[str]],
-        **kwargs
     ) -> Union[np.ndarray, List[np.ndarray]]:
         """Get token logits for predicting response tokens given prompts."""
         if not self._is_loaded:

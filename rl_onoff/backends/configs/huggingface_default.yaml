@@ -2,10 +2,7 @@ backend_type: huggingface
 model_name: gpt2
 
 # HuggingFace-specific parameters
-device: null  # "cpu", "cuda", "cuda:0", etc. (null = auto-detect)
-torch_dtype: null  # "float32", "float16", "bfloat16" (null = auto)
-device_map: null  # "auto", "balanced", etc. (null = use device)
-
-# Additional kwargs for backend initialization
-backend_kwargs: {}
-
+backend_specific:
+  device: null  # "cpu", "cuda", "cuda:0", etc. (null = auto-detect)
+  torch_dtype: null  # "float32", "float16", "bfloat16" (null = auto)
+  device_map: null  # "auto", "balanced", etc. (null = use device)

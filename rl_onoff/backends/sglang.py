@@ -40,15 +40,20 @@ class SGLangBackend(BaseBackend):
                 "SGLang is not installed. Install it with: pip install 'sglang[all]'"
             )
         
+        from rl_onoff.backends.config import SGLangBackendConfig
+        
+        if not isinstance(config.backend_config, SGLangBackendConfig):
+            raise TypeError("config.backend_config must be SGLangBackendConfig")
+        
         super().__init__(config.model_name)
         
-        # Extract SGLang-specific parameters from config
-        self.tp_size = config.tp_size or 1
-        self.mem_fraction_static = config.mem_fraction_static or 0.85
-        self.context_length = config.context_length
-        self.sglang_kwargs = config.backend_kwargs or {}
+        # Extract SGLang-specific parameters from nested config
+        sgl_config = config.backend_config
+        self.tp_size = sgl_config.tp_size or 1
+        self.mem_fraction_static = sgl_config.mem_fraction_static or 0.85
+        self.context_length = sgl_config.context_length
 
-    def load(self, **kwargs) -> None:
+    def load(self) -> None:
         """Load the SGLang runtime."""
         if self._is_loaded:
             return
@@ -58,8 +63,6 @@ class SGLangBackend(BaseBackend):
         load_kwargs = {
             "tp_size": self.tp_size,
             "mem_fraction_static": self.mem_fraction_static,
-            **self.sglang_kwargs,
-            **kwargs
         }
         
         if self.context_length is not None:
@@ -96,7 +99,6 @@ class SGLangBackend(BaseBackend):
         stop_strings: Optional[List[str]] = None,
         return_logits: bool = False,
         return_probs: bool = False,
-        **kwargs
     ) -> Union[str, List[str], Dict[str, Any], List[Dict[str, Any]]]:
         """Generate text from prompts."""
         if not self._is_loaded:
@@ -110,7 +112,6 @@ class SGLangBackend(BaseBackend):
         sampling_params = {
             "temperature": temperature if do_sample else 0.0,
             "max_new_tokens": max_length,
-            **kwargs
         }
         
         # Handle stop strings
@@ -142,7 +143,6 @@ class SGLangBackend(BaseBackend):
         self,
         prompts: Union[str, List[str]],
         responses: Union[str, List[str]],
-        **kwargs
     ) -> Union[np.ndarray, List[np.ndarray]]:
         """Get token logits for predicting response tokens given prompts."""
         if not self._is_loaded:

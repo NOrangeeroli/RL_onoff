@@ -21,23 +21,21 @@ class BaseReward(ABC):
         self,
         predictions: Union[str, List[str]],
         references: Union[str, List[str], List[List[str]]],
-        **kwargs
     ) -> Union[float, Dict[str, float]]:
         """Compute reward value(s).
         
         Args:
             predictions: Predicted text(s)
             references: Reference text(s) or list of reference lists
-            **kwargs: Additional arguments
             
         Returns:
             Reward value(s) as float or dict of reward values
         """
         pass
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args):
         """Allow reward to be called directly."""
-        return self.compute(*args, **kwargs)
+        return self.compute(*args)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name})"
@@ -81,7 +79,6 @@ class RewardRegistry:
         predictions: Union[str, List[str]],
         references: Union[str, List[str], List[List[str]]],
         reward_names: Optional[List[str]] = None,
-        **kwargs
     ) -> Dict[str, Union[float, Dict[str, float]]]:
         """Compute all registered rewards or a subset.
         
@@ -89,7 +86,6 @@ class RewardRegistry:
             predictions: Predicted text(s)
             references: Reference text(s)
             reward_names: Optional list of reward names to compute (all if None)
-            **kwargs: Additional arguments passed to rewards
             
         Returns:
             Dictionary mapping reward names to their values
@@ -100,7 +96,7 @@ class RewardRegistry:
         for name in rewards_to_compute:
             reward = self.get(name)
             try:
-                results[name] = reward.compute(predictions, references, **kwargs)
+                results[name] = reward.compute(predictions, references)
             except Exception as e:
                 results[name] = {"error": str(e)}
         

@@ -23,7 +23,6 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from rl_onoff.backends import create_backend
-from rl_onoff.backends.config import BackendConfig
 from rl_onoff.distributions import DistributionExtractor
 
 
@@ -185,12 +184,8 @@ def main(
     # Initialize backend
     backend_config_dict = exp_config.get("backend", {})
     print("\nInitializing backend...")
-    backend_config = BackendConfig(
-        backend_type=backend_config_dict.get("backend_type", "huggingface"),
-        model_name=backend_config_dict.get("model_name", "meta-llama/Llama-3.2-3B"),
-        **backend_config_dict.get("backend_kwargs", {})
-    )
-    backend = create_backend(backend_config)
+    # Just pass the dict directly - create_backend handles everything!
+    backend = create_backend(backend_config_dict)
     backend.load()
     print("Backend loaded successfully!")
     
@@ -297,6 +292,10 @@ def main(
         for r in all_dist_results
     )
     
+    # Get backend config info from the dict
+    backend_type_str = backend_config_dict.get("backend_type", "huggingface")
+    backend_model_name = backend_config_dict.get("model_name", "unknown")
+    
     statistics = {
         "num_examples": len(all_dist_results),
         "total_samples": total_samples,
@@ -305,8 +304,8 @@ def main(
         "distribution_type": "logits" if use_logits else "probabilities",
         "temperature": temperature,
         "backend": {
-            "backend_type": backend_config.backend_type,
-            "model_name": backend_config.model_name,
+            "backend_type": backend_type_str,
+            "model_name": backend_model_name,
         },
         "input_file": str(input_results_path)
     }

@@ -12,13 +12,10 @@
   # Option 2: Configure task directly (more flexible)
   task:
     template_type: "chatml"  # Options: "openai", "llama", "chatml", "simple"
-    template_kwargs: {}  # Additional kwargs for template creation
     
-    reward_type: "math_verify"  # Options: "math_verify", "exact_match", "bleu", "rouge", "perplexity"
-    reward_kwargs: {}  # Additional kwargs for reward creation
+    reward_type: "math_verify"  # Only option available
     
     format_type: "boxed"  # Options: "boxed", "structured"
-    format_kwargs: {}  # Additional kwargs for format creation
 
   dataset:
     name: "aime2025"  # Dataset name: "aime2025", "amc23", "gsm8k_level1", "math"
@@ -28,7 +25,10 @@
   backend:
     backend_type: "huggingface"
     model_name: "Qwen/Qwen3-4B"
-    backend_kwargs: {}
+    backend_specific:
+      device: null
+      torch_dtype: null
+      device_map: null
 
   # Sampling configuration: either specify sampling_config file OR configure directly
   # Option 1: Use a sampling config file (backward compatible)
@@ -60,8 +60,10 @@
   backend:
     backend_type: "huggingface"
     model_name: "Qwen/Qwen3-4B"
-    # Additional backend config can be added here if needed
-    backend_kwargs: {}
+    backend_specific:
+      device: null
+      torch_dtype: null
+      device_map: null
 
   distribution:
     use_logits: false  # If true, extract logits; if false, extract probabilities

@@ -1,21 +1,11 @@
 """Rewards framework for evaluating model outputs."""
 
 from rl_onoff.tasks.rewards.base import BaseReward, RewardRegistry
-from rl_onoff.tasks.rewards.builtin import (
-    PerplexityReward,
-    BLEUReward,
-    ROUGEReward,
-    ExactMatchReward,
-    MathVerifyReward,
-)
+from rl_onoff.tasks.rewards.math_verify import MathVerifyReward
 
 # Registry mapping string names to reward classes
 REWARD_REGISTRY = {
     "math_verify": MathVerifyReward,
-    "exact_match": ExactMatchReward,
-    "bleu": BLEUReward,
-    "rouge": ROUGEReward,
-    "perplexity": PerplexityReward,
 }
 
 
@@ -23,9 +13,8 @@ def create_reward(config: dict) -> BaseReward:
     """Create a reward instance from a config dict.
     
     Args:
-        config: Dictionary with 'name' key and optional 'kwargs' key
-                Example: {"name": "math_verify", "kwargs": {...}}
-                Or: {"name": "exact_match"}
+        config: Dictionary with 'name' key
+                Example: {"name": "math_verify"}
         
     Returns:
         Reward instance
@@ -46,17 +35,16 @@ def create_reward(config: dict) -> BaseReward:
             f"Available: {list(REWARD_REGISTRY.keys())}"
         )
     
-    kwargs = config.get("kwargs", {})
-    return REWARD_REGISTRY[name](**kwargs)
+    # Get reward class from registry
+    reward_class = REWARD_REGISTRY[name]
+    
+    # MathVerifyReward takes no parameters
+    return reward_class()
 
 
 __all__ = [
     "BaseReward",
     "RewardRegistry",
-    "PerplexityReward",
-    "BLEUReward",
-    "ROUGEReward",
-    "ExactMatchReward",
     "MathVerifyReward",
     "REWARD_REGISTRY",
     "create_reward",

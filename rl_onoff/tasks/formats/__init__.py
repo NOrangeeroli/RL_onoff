@@ -15,9 +15,9 @@ def create_format(config: dict) -> BaseFormat:
     """Create a format instance from a config dict.
     
     Args:
-        config: Dictionary with 'name' key and optional 'kwargs' key
-                Example: {"name": "boxed", "kwargs": {...}}
-                Or: {"name": "structured"}
+        config: Dictionary with 'name' key
+                Example: {"name": "boxed"}
+                Note: Formats don't take any initialization parameters
         
     Returns:
         Format instance
@@ -38,8 +38,8 @@ def create_format(config: dict) -> BaseFormat:
             f"Available: {list(FORMAT_REGISTRY.keys())}"
         )
     
-    kwargs = config.get("kwargs", {})
-    return FORMAT_REGISTRY[name](**kwargs)
+    # Formats don't take any initialization parameters
+    return FORMAT_REGISTRY[name]()
 
 
 __all__ = [

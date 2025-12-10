@@ -24,7 +24,6 @@ class BaseChatTemplate(ABC):
         self,
         messages: List[Dict[str, str]],
         add_generation_prompt: bool = False,
-        **kwargs
     ) -> str:
         """Format messages into a single prompt string.
         
@@ -32,7 +31,6 @@ class BaseChatTemplate(ABC):
             messages: List of message dicts with 'role' and 'content' keys.
                      Roles are typically 'system', 'user', or 'assistant'.
             add_generation_prompt: If True, add prompt tokens for assistant response
-            **kwargs: Additional formatting options
             
         Returns:
             Formatted prompt string

@@ -14,7 +14,7 @@ from rl_onoff.tasks.rewards import REWARD_REGISTRY
 
 # Type aliases for valid values
 TemplateType = Literal["openai", "llama", "chatml", "simple"]
-RewardType = Literal["math_verify", "exact_match", "bleu", "rouge", "perplexity"]
+RewardType = Literal["math_verify"]
 FormatType = Literal["boxed", "structured"]
 
 
@@ -33,22 +33,11 @@ class TaskConfig(Config):
     """
     
     template_type: TemplateType = "simple"
-    reward_type: RewardType = "exact_match"
+    reward_type: RewardType = "math_verify"
     format_type: FormatType = "boxed"
-    
-    # Additional parameters that can be passed to template/reward/format creation
-    template_kwargs: Optional[Dict[str, Any]] = None
-    reward_kwargs: Optional[Dict[str, Any]] = None
-    format_kwargs: Optional[Dict[str, Any]] = None
     
     def __post_init__(self):
         """Initialize default values for optional fields and validate types."""
-        if self.template_kwargs is None:
-            self.template_kwargs = {}
-        if self.reward_kwargs is None:
-            self.reward_kwargs = {}
-        if self.format_kwargs is None:
-            self.format_kwargs = {}
         
         # Validate template_type
         if self.template_type not in CHAT_TEMPLATE_REGISTRY:
