@@ -573,12 +573,20 @@ class HuggingFaceBackend(BaseBackend):
             truncation=True,
         )
         # Determine target device for inputs
-        # If using device_map, the model will automatically handle device placement
-        # Otherwise, move inputs to the specified device
-        if not hasattr(self.model, 'hf_device_map'):
-            # Not using device_map: move inputs to device
+        if hasattr(self.model, 'hf_device_map'):
+            # Using device_map: find the device of the embedding layer
+            # This is where input_ids should be placed
+            try:
+                # Get the embedding layer's device
+                embedding_layer = self.model.get_input_embeddings()
+                input_device = next(embedding_layer.parameters()).device
+            except (AttributeError, StopIteration):
+                # Fallback: use the device of the first parameter
+                input_device = next(iter(self.model.parameters())).device
+            inputs = {k: v.to(input_device) for k, v in inputs.items()}
+        else:
+            # Not using device_map: move inputs to specified device
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
-        # If using device_map, inputs will be automatically moved by the model's generate() method
 
         # Prepare generation kwargs
         gen_kwargs = {
