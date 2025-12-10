@@ -1,0 +1,84 @@
+# Unified experiment configuration file
+# Each experiment script (00-sample, 01-dist, etc.) has its own section
+
+# =============================================================================
+# 00-sample.py configuration
+# =============================================================================
+00_sample:
+  # Task configuration: either specify task_config file OR configure directly
+  # Option 1: Use a task config file (backward compatible)
+  # task_config: "rl_onoff/tasks/configs/math_default.yaml"
+  
+  # Option 2: Configure task directly (more flexible)
+  task:
+    template_type: "chatml"  # Options: "openai", "llama", "chatml", "simple"
+    template_kwargs: {}  # Additional kwargs for template creation
+    
+    reward_type: "math_verify"  # Options: "math_verify", "exact_match", "bleu", "rouge", "perplexity"
+    reward_kwargs: {}  # Additional kwargs for reward creation
+    
+    format_type: "boxed"  # Options: "boxed", "structured"
+    format_kwargs: {}  # Additional kwargs for format creation
+
+  dataset:
+    name: "gsm8k_level1"  # Dataset name
+    split: "test"  # "test" or "train"
+    num_examples: 10  # null = process all, or integer to limit
+
+  backend:
+    backend_type: "huggingface"
+    model_name: "meta-llama/Llama-3.2-3B"
+    backend_kwargs: {}
+
+  # Sampling configuration: either specify sampling_config file OR configure directly
+  # Option 1: Use a sampling config file (backward compatible)
+  # sampling_config: "rl_onoff/sampling/configs/default.yaml"
+  
+  # Option 2: Configure sampling directly (more flexible)
+  sampling:
+    max_length: 2048  # Maximum generation length
+    temperature: 1.0  # Sampling temperature (0.0 = deterministic)
+    top_k: null  # Top-k sampling (null = disabled)
+    top_p: null  # Nucleus sampling (null = disabled)
+    do_sample: true  # Whether to use sampling (false = greedy)
+    num_samples: 8  # Number of samples per prompt
+    batch_size: 48  # Batch size for generation (null = no batching)
+    seed: null  # Random seed (null = random)
+    stop_strings: ["\n\n"]  # Stop generation at these strings
+
+  output:
+    dir: "exp/00-sample/output"  # Output directory (relative to project root)
+
+
+# =============================================================================
+# 01-dist.py configuration
+# =============================================================================
+01_dist:
+  input:
+    results_file: "exp/00-sample/output/results.json"  # Path to results from 00-sample.py
+
+  backend:
+    backend_type: "huggingface"
+    model_name: "meta-llama/Llama-3.2-3B"
+    # Additional backend config can be added here if needed
+    backend_kwargs: {}
+
+  distribution:
+    use_logits: false  # If true, extract logits; if false, extract probabilities
+    temperature: 1.0  # Temperature for probability normalization
+
+  output:
+    dir: "exp/01-dist/output"  # Output directory (relative to project root)
+
+
+# =============================================================================
+# 02-visualize.py configuration
+# =============================================================================
+02_visualize:
+  input:
+    results_dir: "exp/01-dist/output"  # Path to 01-dist output directory
+
+  output:
+    # Visualization doesn't save output, but you can add settings here if needed
+    # e.g., default number of tokens to show, etc.
+

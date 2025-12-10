@@ -31,13 +31,13 @@ def load_experiment_config(config_path: Optional[str] = None) -> dict:
     """Load experiment configuration from YAML file.
     
     Args:
-        config_path: Path to config file (default: 01-dist_config.yaml in same directory)
+        config_path: Path to config file (default: experiment_config.yaml in same directory)
         
     Returns:
-        Dictionary with configuration
+        Dictionary with configuration for 01-dist
     """
     if config_path is None:
-        config_path = Path(__file__).parent / "01-dist_config.yaml"
+        config_path = Path(__file__).parent / "experiment_config.yaml"
     else:
         config_path = Path(config_path)
     
@@ -45,7 +45,12 @@ def load_experiment_config(config_path: Optional[str] = None) -> dict:
         raise FileNotFoundError(f"Config file not found: {config_path}")
     
     with open(config_path, 'r', encoding='utf-8') as f:
-        config = yaml.safe_load(f)
+        all_configs = yaml.safe_load(f)
+    
+    # Extract the 01_dist section
+    config = all_configs.get("01_dist", {})
+    if not config:
+        raise ValueError("Config file missing '01_dist' section")
     
     return config
 
@@ -418,7 +423,7 @@ if __name__ == "__main__":
         "--config",
         type=str,
         default=None,
-        help="Path to experiment config file (default: 01-dist_config.yaml)"
+        help="Path to experiment config file (default: experiment_config.yaml)"
     )
     
     args = parser.parse_args()

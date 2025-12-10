@@ -154,8 +154,23 @@ def main():
     # Sidebar for configuration
     st.sidebar.header("Configuration")
     
-    # Get results directory
+    # Get results directory (can load from config if needed)
     default_results_dir = project_root / "exp" / "01-dist" / "output"
+    
+    # Try to load from config file
+    config_path = Path(__file__).parent / "experiment_config.yaml"
+    if config_path.exists():
+        try:
+            import yaml
+            with open(config_path, 'r', encoding='utf-8') as f:
+                all_configs = yaml.safe_load(f)
+            viz_config = all_configs.get("02_visualize", {})
+            input_config = viz_config.get("input", {})
+            if "results_dir" in input_config:
+                default_results_dir = project_root / input_config["results_dir"]
+        except Exception:
+            pass  # Use default if config loading fails
+    
     results_dir_str = st.sidebar.text_input(
         "Results Directory",
         value=str(default_results_dir),

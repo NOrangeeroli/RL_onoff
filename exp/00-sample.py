@@ -33,13 +33,13 @@ def load_experiment_config(config_path: Optional[str] = None) -> dict:
     """Load experiment configuration from YAML file.
     
     Args:
-        config_path: Path to config file (default: 00-sample_config.yaml in same directory)
+        config_path: Path to config file (default: experiment_config.yaml in same directory)
         
     Returns:
-        Dictionary with configuration
+        Dictionary with configuration for 00-sample
     """
     if config_path is None:
-        config_path = Path(__file__).parent / "00-sample_config.yaml"
+        config_path = Path(__file__).parent / "experiment_config.yaml"
     else:
         config_path = Path(config_path)
     
@@ -47,7 +47,12 @@ def load_experiment_config(config_path: Optional[str] = None) -> dict:
         raise FileNotFoundError(f"Config file not found: {config_path}")
     
     with open(config_path, 'r', encoding='utf-8') as f:
-        config = yaml.safe_load(f)
+        all_configs = yaml.safe_load(f)
+    
+    # Extract the 00_sample section
+    config = all_configs.get("00_sample", {})
+    if not config:
+        raise ValueError("Config file missing '00_sample' section")
     
     return config
 
@@ -73,10 +78,33 @@ def main(
     print("=" * 80)
     
     # Load task config
-    task_config_path = exp_config.get("task_config", "rl_onoff/tasks/configs/math_default.yaml")
-    task_config = project_root / task_config_path
-    print(f"\nLoading task config from {task_config}...")
-    task = create_task(task_config)
+    # Support two modes:
+    # 1. task_config: path to a task config file
+    # 2. task: direct configuration dict
+    task_config_path = None
+    if "task_config" in exp_config:
+        # Mode 1: Load from task config file
+        task_config_path = exp_config.get("task_config")
+        task_config = project_root / task_config_path
+        print(f"\nLoading task config from {task_config}...")
+        task = create_task(task_config)
+    elif "task" in exp_config:
+        # Mode 2: Direct configuration
+        task_config_dict = exp_config.get("task")
+        print(f"\nCreating task from direct configuration...")
+        print(f"  Template: {task_config_dict.get('template_type')}")
+        print(f"  Reward: {task_config_dict.get('reward_type')}")
+        print(f"  Format: {task_config_dict.get('format_type')}")
+        task = create_task(task_config_dict)
+        # For statistics, use a descriptive string
+        task_config_path = "direct_config"
+    else:
+        # Default fallback
+        task_config_path = "rl_onoff/tasks/configs/math_default.yaml"
+        task_config = project_root / task_config_path
+        print(f"\nUsing default task config from {task_config}...")
+        task = create_task(task_config)
+    
     print(f"Task: template={task.config.template_type}, "
           f"format={task.config.format_type}, "
           f"reward={task.config.reward_type}")
@@ -122,10 +150,29 @@ def main(
     sampler = Sampler(backend)
     
     # Load sampling config
-    sampling_config_path_str = exp_config.get("sampling_config", "rl_onoff/sampling/configs/default.yaml")
-    sampling_config_path = project_root / sampling_config_path_str
-    print(f"\nLoading sampling config from {sampling_config_path}...")
-    sampling_config = SamplingConfig.from_file(sampling_config_path)
+    # Support two modes:
+    # 1. sampling_config: path to a sampling config file
+    # 2. sampling: direct configuration dict
+    if "sampling_config" in exp_config:
+        # Mode 1: Load from sampling config file
+        sampling_config_path_str = exp_config.get("sampling_config")
+        sampling_config_path = project_root / sampling_config_path_str
+        print(f"\nLoading sampling config from {sampling_config_path}...")
+        sampling_config = SamplingConfig.from_file(sampling_config_path)
+    elif "sampling" in exp_config:
+        # Mode 2: Direct configuration
+        sampling_config_dict = exp_config.get("sampling")
+        print(f"\nCreating sampling config from direct configuration...")
+        print(f"  Max length: {sampling_config_dict.get('max_length')}")
+        print(f"  Temperature: {sampling_config_dict.get('temperature')}")
+        print(f"  Num samples: {sampling_config_dict.get('num_samples')}")
+        sampling_config = SamplingConfig.from_dict(sampling_config_dict)
+    else:
+        # Default fallback
+        sampling_config_path = project_root / "rl_onoff/sampling/configs/default.yaml"
+        print(f"\nUsing default sampling config from {sampling_config_path}...")
+        sampling_config = SamplingConfig.from_file(sampling_config_path)
+    
     print(f"Sampling config: max_length={sampling_config.max_length}, "
           f"temperature={sampling_config.temperature}, "
           f"num_samples={sampling_config.num_samples}")
@@ -210,7 +257,7 @@ def main(
         "dataset": f"{dataset_name} ({dataset_split})",
         "model": backend_config.model_name,
         "backend": backend_config.backend_type,
-        "task_config_path": str(task_config),
+        "task_config_path": str(task_config_path),
         "num_examples": len(all_results),
         "num_samples_per_example": sampling_config.num_samples,
         "total_samples": total_samples,
