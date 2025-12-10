@@ -24,7 +24,7 @@
 
   backend:
     backend_type: "huggingface"
-    model_name: "Qwen/Qwen3-4B"
+    model_name: "meta-llama/Llama-3.2-3B-Instruct"
     backend_specific:
       device: null
       torch_dtype: null
@@ -43,7 +43,7 @@
     top_p: null  # Nucleus sampling (null = disabled)
     do_sample: true  # Whether to use sampling (false = greedy)
     num_samples: 8  # Number of samples per prompt
-    batch_size: 48  # Batch size for generation (null = no batching)
+    batch_size: 256  # Batch size for generation (null = no batching)
     seed: null  # Random seed (null = random)
     stop_strings: null #["\n\n"]  # Stop generation at these strings
 
@@ -60,7 +60,7 @@
 
   backend:
     backend_type: "huggingface"
-    model_name: "Qwen/Qwen3-4B"
+    model_name: "meta-llama/Llama-3.2-3B-Instruct"
     backend_specific:
       device: null
       torch_dtype: null
