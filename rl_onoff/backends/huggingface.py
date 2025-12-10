@@ -181,14 +181,17 @@ class HuggingFaceBackend(BaseBackend):
                 gen_kwargs["top_p"] = top_p
 
         # Generate
+        # Get the actual model (unwrap DataParallel if needed)
+        model_to_use = self.model.module if isinstance(self.model, torch.nn.DataParallel) else self.model
+        
         with torch.no_grad():
             if return_logits or return_probs:
-                outputs = self.model.generate(**inputs, **gen_kwargs)
+                outputs = model_to_use.generate(**inputs, **gen_kwargs)
                 # outputs is a GenerateDecoderOnlyOutput object
                 generated_ids = outputs.sequences
                 scores = outputs.scores  # List of tensors, one per generated token
             else:
-                outputs = self.model.generate(**inputs, **gen_kwargs)
+                outputs = model_to_use.generate(**inputs, **gen_kwargs)
                 generated_ids = outputs
 
         # Decode outputs (remove input tokens)
@@ -275,9 +278,12 @@ class HuggingFaceBackend(BaseBackend):
 
         all_logits = []
         
+        # Get the actual model (unwrap DataParallel if needed)
+        model_to_use = self.model.module if isinstance(self.model, torch.nn.DataParallel) else self.model
+        
         with torch.no_grad():
             # Get logits for the full sequence
-            outputs = self.model(**full_inputs)
+            outputs = model_to_use(**full_inputs)
             logits = outputs.logits  # (batch_size, seq_len, vocab_size)
             
             # Extract logits for solution tokens only
