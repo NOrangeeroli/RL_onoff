@@ -216,48 +216,6 @@ class HuggingFaceBackend(BaseBackend):
         print(f"  Tensor parallel size: {tp_size}")
         print(f"  Total GPUs: {num_gpus}")
         
-        # Manual distributed initialization if not already initialized
-        # When using accelerate launch, distributed should be initialized, but ParallelismConfig
-        # might need it initialized before creating the Accelerator
-        if not dist.is_initialized():
-            print("Distributed not initialized, setting up manually...")
-            # Check if environment variables are set (e.g., by accelerate launch or torchrun)
-            rank = int(os.environ.get('RANK', '0'))
-            world_size = int(os.environ.get('WORLD_SIZE', str(dp_shard_size)))
-            local_rank = int(os.environ.get('LOCAL_RANK', '0'))
-            
-            # Set up missing environment variables
-            if 'MASTER_ADDR' not in os.environ:
-                os.environ['MASTER_ADDR'] = 'localhost'
-            if 'MASTER_PORT' not in os.environ:
-                os.environ['MASTER_PORT'] = '29500'
-            
-            # Initialize process group
-            try:
-                dist.init_process_group(
-                    backend='nccl',
-                    init_method='env://',
-                    world_size=world_size,
-                    rank=rank
-                )
-                print(f"Distributed initialized: rank={rank}, world_size={world_size}, local_rank={local_rank}")
-            except Exception as e:
-                raise RuntimeError(
-                    f"Failed to initialize distributed environment: {e}\n"
-                    f"To use Accelerate with ParallelismConfig, either:\n"
-                    f"  1. Launch with: accelerate launch --num_processes={dp_shard_size} your_script.py\n"
-                    f"  2. Launch with: torchrun --nproc_per_node={dp_shard_size} your_script.py\n"
-                    f"  3. Or ensure distributed environment variables (RANK, WORLD_SIZE, LOCAL_RANK) are set correctly"
-                )
-        else:
-            rank = dist.get_rank()
-            world_size = dist.get_world_size()
-            print(f"Distributed already initialized: rank={rank}, world_size={world_size}")
-            
-            # Verify world_size matches dp_shard_size
-            if world_size != dp_shard_size:
-                print(f"Warning: WORLD_SIZE ({world_size}) does not match dp_shard_size ({dp_shard_size})")
-        
         # Configure parallelism
         parallelism_config = ParallelismConfig(
             dp_shard_size=dp_shard_size,
@@ -265,10 +223,20 @@ class HuggingFaceBackend(BaseBackend):
         )
         
         # Initialize Accelerator with parallelism config
+        # Accelerator will automatically handle distributed initialization
+        # when using accelerate launch or if environment variables are set
         self.accelerator = Accelerator(parallelism_config=parallelism_config)
         self.use_accelerate = True
         
         print(f"Accelerate initialized with dp_shard_size={dp_shard_size}, tp_size={tp_size}")
+        
+        # Check distributed status after Accelerator initialization (for logging only)
+        if dist.is_initialized():
+            rank = dist.get_rank()
+            world_size = dist.get_world_size()
+            print(f"Distributed environment: rank={rank}, world_size={world_size}")
+            if world_size != dp_shard_size:
+                print(f"Warning: WORLD_SIZE ({world_size}) does not match dp_shard_size ({dp_shard_size})")
         
         # Load model
         print("Loading model with Accelerate...")
