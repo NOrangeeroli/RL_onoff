@@ -452,8 +452,14 @@ class HuggingFaceBackend(BaseBackend):
             # Use gather_object for Python objects (lists, dicts, strings)
             # gather_object is a torch.distributed function (PyTorch 1.8+)
             if hasattr(dist, 'gather_object'):
-                gathered_list = [None] * world_size
+                # Only rank 0 needs to provide gather_list, others pass None
+                if rank == 0:
+                    gathered_list = [None] * world_size
+                else:
+                    gathered_list = None
+                
                 dist.gather_object(local_results, gathered_list, dst=0)
+                
                 if rank == 0:
                     # Flatten the list of lists
                     gathered_results = []
@@ -730,8 +736,14 @@ class HuggingFaceBackend(BaseBackend):
             # Use gather_object for Python objects (lists of numpy arrays)
             # gather_object is a torch.distributed function (PyTorch 1.8+)
             if hasattr(dist, 'gather_object'):
-                gathered_list = [None] * world_size
+                # Only rank 0 needs to provide gather_list, others pass None
+                if rank == 0:
+                    gathered_list = [None] * world_size
+                else:
+                    gathered_list = None
+                
                 dist.gather_object(local_logits, gathered_list, dst=0)
+                
                 if rank == 0:
                     # Flatten the list of lists
                     gathered_logits = []
