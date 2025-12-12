@@ -100,10 +100,12 @@ class HuggingFaceBackend(BaseBackend):
         num_gpus = torch.cuda.device_count()
         
         # Calculate parallelism parameters if tp_size is specified
+        # Always calculate dp_shard_size when tp_size is set (even if tp_size=1)
+        # This ensures num_process = dp_shard_size
         dp_shard_size = None
         tp_size = None
-        if self.tp_size is not None and self.tp_size > 1:
-            # Tensor parallelism specified - calculate number of replicas
+        if self.tp_size is not None:
+            # tp_size can be 1 or greater - always calculate dp_shard_size
             if num_gpus == 0:
                 raise ValueError("CUDA not available. Cannot set up multi-GPU parallelism.")
             if self.tp_size > num_gpus:
@@ -117,12 +119,13 @@ class HuggingFaceBackend(BaseBackend):
             dp_shard_size = num_gpus // self.tp_size  # Number of model replicas
             tp_size = self.tp_size
         
-        # Use Accelerate only for multi-process data parallelism (dp_shard_size > 1)
-        # For single-process tensor parallelism (dp_shard_size = 1), use device_map="auto"
+        # Use Accelerate for multi-process setups (dp_shard_size > 1)
+        # This includes both data parallelism (tp_size=1) and hybrid parallelism (tp_size>1)
+        # This ensures num_process = dp_shard_size
         if dp_shard_size is not None and dp_shard_size > 1:
             if not ACCELERATE_AVAILABLE:
                 raise ImportError(
-                    "accelerate is required for multi-process data parallelism. "
+                    "accelerate is required for multi-process parallelism. "
                     "Install it with: pip install accelerate"
                 )
             self._setup_with_accelerate(dp_shard_size, tp_size)
@@ -131,6 +134,10 @@ class HuggingFaceBackend(BaseBackend):
             # Single-process tensor parallelism: use device_map="auto"
             print(f"Using device_map='auto' for single-process tensor parallelism (tp_size={tp_size})")
             # Fall through to regular model loading with device_map="auto"
+        elif dp_shard_size == 1 and tp_size == 1:
+            # Single GPU case: use single device (no device_map="auto")
+            print(f"Using single GPU mode (dp_shard_size=1, tp_size=1)")
+            # Fall through to regular model loading without device_map
         
         # Prepare model loading kwargs for single model
         model_kwargs = {}
@@ -144,11 +151,16 @@ class HuggingFaceBackend(BaseBackend):
         # we already printed a message above, so use "auto"
         if dp_shard_size == 1 and tp_size is not None and tp_size > 1:
             model_kwargs["device_map"] = "auto"
+        elif dp_shard_size == 1 and tp_size == 1:
+            # Single GPU: don't use device_map="auto" - use single device
+            # Will fall through to set device manually
+            pass
         elif self.device_map is not None:
             model_kwargs["device_map"] = self.device_map
             print(f"Using device_map: {self.device_map}")
         elif torch.cuda.device_count() > 1:
-            # Use "auto" for multi-GPU setups
+            # Use "auto" for multi-GPU setups (only if tp_size not explicitly set)
+            # If tp_size was set, we should have handled it above
             model_kwargs["device_map"] = "auto"
             print(f"Using device_map: auto (for {torch.cuda.device_count()} GPUs)")
         else:

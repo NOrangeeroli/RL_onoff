@@ -9,12 +9,13 @@ This script:
 """
 
 import json
+import os
 import sys
 import yaml
 import numpy as np
 import traceback
 from pathlib import Path
-from typing import List, Dict, Optional, Union, Union
+from typing import List, Dict, Optional, Union, Tuple
 from tqdm import tqdm
 
 # Add project root to Python path
@@ -26,14 +27,14 @@ from rl_onoff.backends import create_backend
 from rl_onoff.distributions import DistributionExtractor
 
 
-def load_experiment_config(config_path: Optional[str] = None) -> dict:
+def load_experiment_config(config_path: Optional[str] = None) -> Tuple[dict, dict]:
     """Load experiment configuration from YAML file.
     
     Args:
         config_path: Path to config file (default: experiment_config.yaml in same directory)
         
     Returns:
-        Dictionary with configuration for 01-dist
+        Tuple of (experiment_config, global_config)
     """
     if config_path is None:
         config_path = Path(__file__).parent / "experiment_config.yaml"
@@ -46,12 +47,28 @@ def load_experiment_config(config_path: Optional[str] = None) -> dict:
     with open(config_path, 'r', encoding='utf-8') as f:
         all_configs = yaml.safe_load(f)
     
+    # Extract global config
+    global_config = all_configs.get("global", {})
+    
     # Extract the 01_dist section
     config = all_configs.get("01_dist", {})
     if not config:
         raise ValueError("Config file missing '01_dist' section")
     
-    return config
+    return config, global_config
+
+
+def apply_global_config(global_config: dict) -> None:
+    """Apply global configuration settings (e.g., CUDA_VISIBLE_DEVICES).
+    
+    Args:
+        global_config: Global configuration dictionary
+    """
+    # Set CUDA_VISIBLE_DEVICES if specified
+    cuda_visible_devices = global_config.get("cuda_visible_devices")
+    if cuda_visible_devices is not None:
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(cuda_visible_devices)
+        print(f"Set CUDA_VISIBLE_DEVICES={cuda_visible_devices}")
 
 
 def get_tokenized_strings(backend, text: str) -> List[str]:
@@ -153,10 +170,13 @@ def main(
     """Main function to extract token-wise distributions.
     
     Args:
-        experiment_config_path: Path to experiment config file (default: 01-dist_config.yaml)
+        experiment_config_path: Path to experiment config file (default: experiment_config.yaml)
     """
     # Load experiment configuration
-    exp_config = load_experiment_config(experiment_config_path)
+    exp_config, global_config = load_experiment_config(experiment_config_path)
+    
+    # Apply global configuration (e.g., CUDA_VISIBLE_DEVICES) before any backend initialization
+    apply_global_config(global_config)
     
     # Set up output directory
     output_dir_str = exp_config.get("output", {}).get("dir", "exp/01-dist/output")

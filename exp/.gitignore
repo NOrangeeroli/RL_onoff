@@ -1,5 +1,6 @@
 # Ignore all output directories
-*/output/*
-# But keep the directory structure
+*/output/
+*/output/**
+# But keep the directory structure and .gitkeep files
 !*/output/.gitkeep
 

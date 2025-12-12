@@ -2,6 +2,15 @@
 # Each experiment script (00-sample, 01-dist, etc.) has its own section
 
 # =============================================================================
+# Global configuration (applies to all experiments)
+# =============================================================================
+global:
+  # GPU configuration: Set visible GPUs for all experiments
+  # Format: "0,1,2,3" or "0" or null (use all available GPUs)
+  # This sets the CUDA_VISIBLE_DEVICES environment variable before backend initialization
+  cuda_visible_devices: 0,1  # Example: "0,1" to use only GPUs 0 and 1
+
+# =============================================================================
 # 00-sample.py configuration
 # =============================================================================
 00_sample:
@@ -11,7 +20,7 @@
   
   # Option 2: Configure task directly (more flexible)
   task:
-    template_type: "chatml"  # Options: "openai", "llama", "chatml", "simple"
+    template_type: "openai"  # Options: "openai", "llama", "chatml", "simple"
     
     reward_type: "math_verify"  # Only option available
     
@@ -24,7 +33,7 @@
 
   backend:
     backend_type: "huggingface"
-    model_name: "meta-llama/Llama-3.2-3B-Instruct"
+    model_name: "/data/chenyamei/pretrained_models/Qwen3-4B"
     backend_specific:
       device: null
       torch_dtype: null
@@ -43,7 +52,7 @@
     top_p: null  # Nucleus sampling (null = disabled)
     do_sample: true  # Whether to use sampling (false = greedy)
     num_samples: 8  # Number of samples per prompt
-    batch_size: 48  # Batch size for generation (null = no batching)
+    batch_size: 12  # Batch size for generation (null = no batching)
     seed: null  # Random seed (null = random)
     stop_strings: null #["\n\n"]  # Stop generation at these strings
 
@@ -60,7 +69,7 @@
 
   backend:
     backend_type: "huggingface"
-    model_name: "meta-llama/Llama-3.2-3B-Instruct"
+    model_name: "/data/chenyamei/pretrained_models/Qwen3-4B"
     backend_specific:
       device: null
       torch_dtype: null

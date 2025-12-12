@@ -18,7 +18,7 @@ if [ ! -f "$CONFIG_PATH" ]; then
     exit 1
 fi
 
-# Parse YAML to check backend type and tp_size
+# Parse YAML to check backend type, tp_size, and global GPU config
 # Using Python to parse YAML (more reliable than bash)
 BACKEND_INFO=$(python3 <<EOF
 import yaml
@@ -28,6 +28,14 @@ import subprocess
 try:
     with open("$CONFIG_PATH", 'r') as f:
         config = yaml.safe_load(f)
+    
+    # Get global config and set CUDA_VISIBLE_DEVICES if specified
+    global_config = config.get('global', {})
+    cuda_visible_devices = global_config.get('cuda_visible_devices')
+    if cuda_visible_devices is not None:
+        import os
+        os.environ['CUDA_VISIBLE_DEVICES'] = str(cuda_visible_devices)
+        print(f"CUDA_VISIBLE_DEVICES={cuda_visible_devices}", file=sys.stderr)
     
     # Get 01_dist section
     dist_config = config.get('01_dist', {})
@@ -41,20 +49,28 @@ try:
     # num_processes = num_gpus // tp_size (data parallelism shards)
     num_processes = None
     if backend_type == "huggingface" and tp_size is not None and tp_size > 0:
-        # Get number of GPUs
+        # Get number of GPUs (respecting CUDA_VISIBLE_DEVICES if set)
         try:
             result = subprocess.run(['nvidia-smi', '--list-gpus'], capture_output=True, text=True, timeout=5)
             if result.returncode == 0:
                 num_gpus = len([line for line in result.stdout.strip().split('\n') if line.strip()])
+                # If CUDA_VISIBLE_DEVICES is set, count only visible GPUs
+                if cuda_visible_devices is not None:
+                    visible_gpus = len(str(cuda_visible_devices).split(','))
+                    num_gpus = min(num_gpus, visible_gpus)
                 if num_gpus > 0 and num_gpus % tp_size == 0:
                     num_processes = num_gpus // tp_size
-                    # Only use accelerate launch if we have multiple processes (data parallelism)
-                    if num_processes == 1:
-                        num_processes = None  # Single process, no need for accelerate launch
+                    # num_processes = dp_shard_size
+                    # Only skip accelerate launch for single GPU case (num_processes=1 and num_gpus=1)
+                    # For multi-GPU with tp_size=1, we need multiple processes (data parallelism)
+                    if num_processes == 1 and num_gpus == 1:
+                        num_processes = None  # Single GPU, single process - no need for accelerate launch
+                    # Otherwise, num_processes = dp_shard_size, always use accelerate when > 1
         except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
             pass
     
-    print(f"{backend_type}|{tp_size or 1}|{num_processes or 1}")
+    # Output: backend_type|tp_size|num_processes|cuda_visible_devices
+    print(f"{backend_type}|{tp_size or 1}|{num_processes or 1}|{cuda_visible_devices or ''}")
 except Exception as e:
     print(f"ERROR: {e}", file=sys.stderr)
     sys.exit(1)
@@ -70,6 +86,13 @@ fi
 BACKEND_TYPE=$(echo "$BACKEND_INFO" | cut -d'|' -f1)
 TP_SIZE=$(echo "$BACKEND_INFO" | cut -d'|' -f2)
 NUM_PROCESSES=$(echo "$BACKEND_INFO" | cut -d'|' -f3)
+CUDA_VISIBLE_DEVICES=$(echo "$BACKEND_INFO" | cut -d'|' -f4)
+
+# Set CUDA_VISIBLE_DEVICES if specified in config
+if [ -n "$CUDA_VISIBLE_DEVICES" ]; then
+    export CUDA_VISIBLE_DEVICES="$CUDA_VISIBLE_DEVICES"
+    echo "Set CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES (from config)"
+fi
 
 echo "Detected backend: $BACKEND_TYPE"
 echo "Detected tp_size: $TP_SIZE"

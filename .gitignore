@@ -59,3 +59,7 @@ logs/
 .DS_Store
 Thumbs.db
 
+# Experiment output directories
+exp/*/output/
+exp/*/output/**
+
