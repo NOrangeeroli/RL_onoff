@@ -501,8 +501,8 @@ if __name__ == "__main__":
     print("Testing BasicProjector with random gradients")
     print("=" * 60)
 
-    grad_dim = 16
-    proj_dim = 4
+    grad_dim = 1024
+    proj_dim = 512
     batch_size = 3
 
     # Random gradients on CPU
