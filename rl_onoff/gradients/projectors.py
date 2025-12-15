@@ -282,6 +282,35 @@ class BasicProjector(AbstractProjector):
         # Scale by 1/sqrt(k) to approximate JL isotropy (k = total proj_dim)
         self.proj_matrix /= math.sqrt(self.proj_dim)
 
+    def project(self, grads: Union[Dict[str, Tensor], Tensor], model_id: int) -> Tensor:
+        """Project a batch of gradients using a block-wise random matrix."""
+        if isinstance(grads, dict):
+            grads = vectorize(grads, device=self.device)
+
+        grads = grads.to(dtype=self.dtype)
+        sketch = ch.zeros(
+            size=(grads.size(0), self.proj_dim), dtype=self.dtype, device=self.device
+        )
+
+        if model_id != self.model_id:
+            self.model_id = model_id
+            self.get_generator_states()
+            if self.num_blocks == 1:
+                self.generate_sketch_matrix(self.generator_states[0])
+
+        if self.num_blocks == 1:
+            ch.matmul(grads.data, self.proj_matrix, out=sketch)
+        else:
+            for ind in range(self.num_blocks):
+                self.generate_sketch_matrix(self.generator_states[ind])
+
+                st = ind * self.block_size
+                ed = min((ind + 1) * self.block_size, self.proj_dim)
+                sketch[:, st:ed] = (
+                    grads.type(self.dtype) @ self.proj_matrix[:, : (ed - st)]
+                )
+        return sketch.type(grads.dtype)
+
 
 # ---------------------------------------------------------------------------
 # Johnson–Lindenstrauss style sanity checks for projectors (CPU, BasicProjector)
@@ -370,34 +399,6 @@ def sanity_checks_projector(
     frac_in = np.mean((distort >= 1 - eps) & (distort <= 1 + eps))
     print("pairwise distortion quantiles (||Px-Py|| / ||x-y||):", qs_dist)
     print(f"fraction within [1±eps] (eps={eps}):", frac_in)
-
-    def project(self, grads: Union[Dict[str, Tensor], Tensor], model_id: int) -> Tensor:
-        if isinstance(grads, dict):
-            grads = vectorize(grads, device=self.device)
-
-        grads = grads.to(dtype=self.dtype)
-        sketch = ch.zeros(
-            size=(grads.size(0), self.proj_dim), dtype=self.dtype, device=self.device
-        )
-
-        if model_id != self.model_id:
-            self.model_id = model_id
-            self.get_generator_states()
-            if self.num_blocks == 1:
-                self.generate_sketch_matrix(self.generator_states[0])
-
-        if self.num_blocks == 1:
-            ch.matmul(grads.data, self.proj_matrix, out=sketch)
-        else:
-            for ind in range(self.num_blocks):
-                self.generate_sketch_matrix(self.generator_states[ind])
-
-                st = ind * self.block_size
-                ed = min((ind + 1) * self.block_size, self.proj_dim)
-                sketch[:, st:ed] = (
-                    grads.type(self.dtype) @ self.proj_matrix[:, : (ed - st)]
-                )
-        return sketch.type(grads.dtype)
 
 
 # ---------------------------------------------------------------------------
