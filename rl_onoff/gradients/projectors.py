@@ -710,7 +710,7 @@ if __name__ == "__main__":
         try:
             import torch.nn.functional as F
             
-            n_cuda = 200
+            n_cuda = 20
             d_cuda = 8192 * 64  # your large dimension
             eps_cuda = 0.2
             k_cuda = 8192       # multiple of 512 for fast_jl
