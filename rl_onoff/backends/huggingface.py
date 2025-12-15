@@ -676,15 +676,58 @@ if __name__ == "__main__":
         "backend_specific": {
             "device": "cuda" if torch.cuda.is_available() else "cpu",
             "lora_config": {
-                "r": 16,  # LoRA rank
+                "r": 1,  # LoRA rank
                 "lora_alpha": 32,  # LoRA alpha scaling factor
-                "target_modules": ["q_proj", "v_proj"],  # Modules to apply LoRA to
+                # Apply LoRA to all linear layers in attention and MLP
+                # For Qwen models, these are the typical module names:
+                "target_modules": [
+                    "q_proj", "k_proj", "v_proj", "o_proj",  # Attention layers
+                    "gate_proj", "up_proj", "down_proj"      # MLP layers
+                ],
                 "lora_dropout": 0.1,  # LoRA dropout rate
             }
         }
     })
     lora_backend = create_backend(lora_backend_config)
     lora_backend.load()
+    
+    # Calculate and print LoRA parameter statistics
+    print("\n" + "-" * 60)
+    print("LoRA Parameter Statistics:")
+    print("-" * 60)
+    
+    # Count trainable (LoRA) parameters
+    trainable_params = sum(p.numel() for p in lora_backend.model.parameters() if p.requires_grad)
+    total_params = sum(p.numel() for p in lora_backend.model.parameters())
+    non_trainable_params = total_params - trainable_params
+    
+    print(f"Total model parameters: {total_params:,}")
+    print(f"Trainable (LoRA) parameters: {trainable_params:,}")
+    print(f"Non-trainable parameters: {non_trainable_params:,}")
+    print(f"Trainable percentage: {100 * trainable_params / total_params:.4f}%")
+    
+    # Count LoRA parameters by module type
+    lora_params_by_module = {}
+    for name, param in lora_backend.model.named_parameters():
+        if param.requires_grad and 'lora' in name.lower():
+            # Extract module type from parameter name (e.g., "base_model.model.layers.0.self_attn.q_proj.lora_A")
+            parts = name.split('.')
+            # Find the module name (q_proj, v_proj, etc.)
+            module_name = None
+            for part in reversed(parts):
+                if part in ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]:
+                    module_name = part
+                    break
+            
+            if module_name:
+                if module_name not in lora_params_by_module:
+                    lora_params_by_module[module_name] = 0
+                lora_params_by_module[module_name] += param.numel()
+    
+    if lora_params_by_module:
+        print("\nLoRA parameters by module type:")
+        for module_name, count in sorted(lora_params_by_module.items()):
+            print(f"  {module_name}: {count:,} parameters")
     
     # Define prompts and responses for gradient computation
     prompts = [
@@ -696,7 +739,7 @@ if __name__ == "__main__":
         " 9"
     ]
     
-    print(f"Computing gradients for {len(prompts)} prompt-response pairs...")
+    print(f"\nComputing gradients for {len(prompts)} prompt-response pairs...")
     gradients = lora_backend.get_lora_gradients(
         prompts=prompts,
         responses=responses,
