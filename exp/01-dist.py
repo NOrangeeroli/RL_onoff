@@ -9,6 +9,7 @@ This script:
 """
 
 import json
+import os
 import sys
 import yaml
 import numpy as np
@@ -155,7 +156,31 @@ def main(
     Args:
         experiment_config_path: Path to experiment config file (default: 01-dist_config.yaml)
     """
-    # Load experiment configuration
+    # Load full config to access global settings
+    if experiment_config_path is None:
+        config_path = Path(__file__).parent / "experiment_config.yaml"
+    else:
+        config_path = Path(experiment_config_path)
+    
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+    
+    with open(config_path, 'r', encoding='utf-8') as f:
+        all_configs = yaml.safe_load(f)
+    
+    # Set up CUDA visible devices from global config (must be done before any CUDA operations)
+    global_config = all_configs.get("global", {})
+    cuda_config = global_config.get("cuda", {})
+    visible_devices = cuda_config.get("visible_devices")
+    if visible_devices is not None:
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(visible_devices)
+        print(f"Set CUDA_VISIBLE_DEVICES={visible_devices}")
+    elif "CUDA_VISIBLE_DEVICES" not in os.environ:
+        print("CUDA_VISIBLE_DEVICES not set, using all available devices")
+    else:
+        print(f"Using existing CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}")
+    
+    # Load experiment-specific configuration
     exp_config = load_experiment_config(experiment_config_path)
     
     # Set up output directory
