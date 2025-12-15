@@ -401,6 +401,123 @@ def sanity_checks_projector(
     print(f"fraction within [1±eps] (eps={eps}):", frac_in)
 
 
+def sanity_checks_cuda_projector(
+    n: int,
+    d: int,
+    k: int,
+    eps: float = 0.2,
+    pairs: int = 20_000,
+    seed: int = 0,
+    proj_type: ProjectionType = ProjectionType.rademacher,
+) -> None:
+    """JL-style sanity checks for CudaProjector on random Gaussian data."""
+    if not torch.cuda.is_available():
+        print("CUDA not available; skipping CudaProjector sanity checks.")
+        return
+
+    device = torch.device("cuda")
+    rng = torch.Generator(device=device).manual_seed(seed)
+
+    # X ~ N(0, I_d)
+    X = torch.randn(n, d, generator=rng, device=device)
+
+    proj = CudaProjector(
+        grad_dim=d,
+        proj_dim=k,
+        seed=seed,
+        proj_type=proj_type,
+        device=device,
+        max_batch_size=min(32, n),
+    )
+    Y = proj.project(X, model_id=0)  # (n, k)
+
+    print("=== Sanity checks for CudaProjector ===")
+    print(f"n={n}, d={d}, k={k}, eps={eps}, proj_type={proj_type}")
+
+    # A) shape check
+    assert Y.shape == (n, k), f"Y shape mismatch: got {Y.shape}, expected {(n, k)}"
+    print("Shape check passed:", Y.shape)
+
+    # B) Norm ratios per point
+    xnorm2 = (X * X).sum(dim=1)
+    ynorm2 = (Y * Y).sum(dim=1)
+    mask = xnorm2 > 0
+    ratios = (ynorm2[mask] / xnorm2[mask]).detach().cpu().numpy()
+    print("norm ratio quantiles (Y^2 / X^2):", np.quantile(ratios, [0.01, 0.1, 0.5, 0.9, 0.99]))
+
+    # C) Pairwise distortion on sampled pairs
+    rng_pairs = torch.Generator(device=device).manual_seed(seed + 1)
+    idx_i = torch.randint(0, n, (pairs,), generator=rng_pairs, device=device)
+    idx_j = torch.randint(0, n, (pairs,), generator=rng_pairs, device=device)
+
+    dx = X[i := idx_i] - X[j := idx_j]
+    dy = Y[i] - Y[j]
+    dist_x = dx.norm(dim=1)
+    dist_y = dy.norm(dim=1)
+    ok = dist_x > 1e-12
+    distort = dist_y[ok] / dist_x[ok]
+    distort_np = distort.detach().cpu().numpy()
+
+    qs_dist = np.quantile(distort_np, [0.01, 0.1, 0.5, 0.9, 0.99])
+    frac_in = np.mean((distort_np >= 1 - eps) & (distort_np <= 1 + eps))
+    print("pairwise distortion quantiles (||Px-Py|| / ||x-y||):", qs_dist)
+    print(f"fraction within [1±eps] (eps={eps}):", frac_in)
+
+
+def sanity_topk_l2_basic(
+    n: int = 64,
+    d: int = 4096,
+    proj_dim: int = 512,
+    k: int = 5,
+    seed: int = 0,
+) -> None:
+    """Top-k L2 nearest-neighbor preservation with BasicProjector."""
+    device = torch.device("cpu")
+    rng = torch.Generator(device=device).manual_seed(seed)
+
+    print("=" * 60)
+    print("Top-k L2 neighbor preservation with BasicProjector")
+    print("=" * 60)
+
+    X = torch.randn(n, d, generator=rng, device=device)
+
+    proj = BasicProjector(
+        grad_dim=d,
+        proj_dim=proj_dim,
+        seed=seed,
+        proj_type=ProjectionType.rademacher,
+        device=device,
+        block_size=min(proj_dim, 256),
+    )
+    Y = proj.project(X, model_id=0)
+
+    # Single query
+    q_idx = 0
+    qx = X[q_idx : q_idx + 1]
+    qy = Y[q_idx : q_idx + 1]
+
+    dists_x = torch.cdist(qx, X).squeeze(0)
+    dists_y = torch.cdist(qy, Y).squeeze(0)
+
+    topk = min(k, n - 1)
+
+    def topk_dists(d: torch.Tensor, topk: int):
+        vals, idx = torch.topk(d, topk + 1, largest=False)
+        return idx[1:], vals[1:]
+
+    idx_x, vals_x = topk_dists(dists_x, topk)
+    idx_y, vals_y = topk_dists(dists_y, topk)
+
+    idx_x = idx_x.tolist()
+    idx_y = idx_y.tolist()
+
+    distort = (vals_y / vals_x).detach().cpu().numpy()
+    print(f"Original top-{topk} neighbor indices: {idx_x}")
+    print(f"Projected top-{topk} neighbor indices: {idx_y}")
+    print("Per-neighbor distance ratio (||Px-P|| / ||x-P||):", distort)
+
+
+
 # ---------------------------------------------------------------------------
 # CudaProjector
 # ---------------------------------------------------------------------------
@@ -701,6 +818,9 @@ if __name__ == "__main__":
     noop = NoOpProjector()
     vec = noop.project(grads_dict, model_id=0)
     print(f"NoOpProjector / vectorize output shape: {vec.shape} (expected {batch_size} x 12)")
+
+    # Top-k L2 neighbor preservation with BasicProjector
+    sanity_topk_l2_basic()
 
     # Optional CUDA / fast_jl smoke test (only runs if CUDA and fast_jl are available)
     if torch.cuda.is_available():
