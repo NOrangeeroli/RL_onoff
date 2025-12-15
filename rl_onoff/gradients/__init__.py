@@ -7,8 +7,6 @@ This package provides:
 
 from .projectors import (
     AbstractProjector,
-    NoOpProjector,
-    BasicSingleBlockProjector,
     BasicProjector,
     CudaProjector,
     ChunkedCudaProjector,
@@ -18,8 +16,6 @@ from .lora_extractor import LoraBGradientProjector
 
 __all__ = [
     "AbstractProjector",
-    "NoOpProjector",
-    "BasicSingleBlockProjector",
     "BasicProjector",
     "CudaProjector",
     "ChunkedCudaProjector",
