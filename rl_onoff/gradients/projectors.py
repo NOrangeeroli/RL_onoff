@@ -105,107 +105,6 @@ class AbstractProjector(ABC):
         pass
 
 
-# ---------------------------------------------------------------------------
-# No-op projector
-# ---------------------------------------------------------------------------
-
-
-class NoOpProjector(AbstractProjector):
-    """Projector that returns gradients unchanged."""
-
-    def __init__(
-        self,
-        grad_dim: int = 0,
-        proj_dim: int = 0,
-        seed: int = 0,
-        proj_type: Union[str, ProjectionType] = "na",
-        device: Union[str, torch.device] = "cuda",
-        *args: Any,
-        **kwargs: Any,
-    ) -> None:
-        super().__init__(grad_dim, proj_dim, seed, proj_type, device)
-
-    def project(self, grads: Union[Dict[str, Tensor], Tensor], model_id: int) -> Tensor:
-        if isinstance(grads, dict):
-            grads = vectorize(grads, device=self.device)
-        return grads
-
-    def free_memory(self) -> None:
-        pass
-
-
-# ---------------------------------------------------------------------------
-# BasicSingleBlockProjector
-# ---------------------------------------------------------------------------
-
-
-class BasicSingleBlockProjector(AbstractProjector):
-    """Bare-bones, single-block projection using matmul."""
-
-    def __init__(
-        self,
-        grad_dim: int,
-        proj_dim: int,
-        seed: int,
-        proj_type: ProjectionType,
-        device: Union[str, torch.device],
-        dtype: torch.dtype = ch.float32,
-        model_id: int = 0,
-        *args: Any,
-        **kwargs: Any,
-    ) -> None:
-        super().__init__(grad_dim, proj_dim, seed, proj_type, device)
-
-        self.model_id = model_id
-        self.proj_type = proj_type
-        self.generator = ch.Generator(device=self.device)
-        self.generator = self.generator.manual_seed(
-            self.seed + int(1e4) * self.model_id
-        )
-        self.dtype = dtype
-
-        self.proj_matrix = ch.empty(
-            self.grad_dim, self.proj_dim, dtype=self.dtype, device=self.device
-        )
-
-        self.proj_matrix_available = True
-        self.generate_sketch_matrix()
-
-    def free_memory(self) -> None:
-        del self.proj_matrix
-        self.proj_matrix_available = False
-
-    def generate_sketch_matrix(self) -> None:
-        if not self.proj_matrix_available:
-            self.proj_matrix = ch.empty(
-                self.grad_dim, self.proj_dim, dtype=self.dtype, device=self.device
-            )
-            self.proj_matrix_available = True
-
-        if self.proj_type == ProjectionType.normal or self.proj_type == "normal":
-            self.proj_matrix.normal_(generator=self.generator)
-        elif self.proj_type == ProjectionType.rademacher or self.proj_type == "rademacher":
-            self.proj_matrix.bernoulli_(p=0.5, generator=self.generator)
-            self.proj_matrix *= 2.0
-            self.proj_matrix -= 1.0
-        else:
-            raise KeyError(f"Projection type {self.proj_type} not recognized.")
-        # Scale by 1/sqrt(k) to approximate JL isotropy (k = proj_dim)
-        self.proj_matrix /= math.sqrt(self.proj_dim)
-
-    def project(self, grads: Union[Dict[str, Tensor], Tensor], model_id: int) -> Tensor:
-        if isinstance(grads, dict):
-            grads = vectorize(grads, device=self.device)
-
-        grads = grads.to(dtype=self.dtype)
-        if model_id != self.model_id:
-            self.model_id = model_id
-            self.generator = self.generator.manual_seed(
-                self.seed + int(1e4) * self.model_id
-            )
-            self.generate_sketch_matrix()
-
-        return grads @ self.proj_matrix
 
 
 # ---------------------------------------------------------------------------
@@ -551,7 +450,7 @@ class CudaProjector(AbstractProjector):
             raise ValueError(err)
 
         self.num_sms = ch.cuda.get_device_properties(device.index).multi_processor_count
-
+        print(f"Number of SMs: {self.num_sms}")
         try:
             import fast_jl  # noqa: F401
 
@@ -807,17 +706,7 @@ if __name__ == "__main__":
     projected = basic_proj.project(grads, model_id=0)
     print(f"BasicProjector output shape: {projected.shape} (expected {batch_size} x {proj_dim})")
 
-    # Test vectorize + NoOpProjector with dict input
-    print("\n" + "=" * 60)
-    print("Testing NoOpProjector with dict of gradients")
-    print("=" * 60)
-    grads_dict = {
-        "w1": torch.randn(batch_size, 5),
-        "w2": torch.randn(batch_size, 7),
-    }
-    noop = NoOpProjector()
-    vec = noop.project(grads_dict, model_id=0)
-    print(f"NoOpProjector / vectorize output shape: {vec.shape} (expected {batch_size} x 12)")
+   
 
     # Top-k L2 neighbor preservation with BasicProjector
     sanity_topk_l2_basic()
