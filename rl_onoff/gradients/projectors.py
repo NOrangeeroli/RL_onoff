@@ -450,7 +450,6 @@ class CudaProjector(AbstractProjector):
             raise ValueError(err)
 
         self.num_sms = ch.cuda.get_device_properties(device.index).multi_processor_count
-        print(f"Number of SMs: {self.num_sms}")
         try:
             import fast_jl  # noqa: F401
 
@@ -493,7 +492,7 @@ class CudaProjector(AbstractProjector):
         try:
             result = fn(
                 grads, self.proj_dim, self.seed + int(1e4) * model_id, self.num_sms
-            )
+            ) / torch.sqrt(self.proj_dim)
         except RuntimeError as e:
             if "CUDA error: too many resources requested for launch" in str(e):
                 raise RuntimeError(
