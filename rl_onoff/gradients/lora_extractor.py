@@ -258,7 +258,7 @@ if __name__ == "__main__":
 
     projector = LoraBGradientProjector(
         backend=backend,
-        proj_dim=16,
+        proj_dim=8192,
         device="cuda" if torch.cuda.is_available() else "cpu",
         use_cuda_projector=False,  # set True if you have fast_jl installed
     )
