@@ -222,96 +222,45 @@ class LoraBGradientProjector:
 
 
 if __name__ == "__main__":
-    """Simple smoke test for LoraBGradientProjector with a dummy backend."""
+    """Simple smoke test for LoraBGradientProjector with a HuggingFace backend."""
 
-    import torch.nn as nn
-    from rl_onoff.backends.base import BaseBackend
-
-    class DummyModel(nn.Module):
-        """Tiny model with a single LoRA B parameter for testing."""
-
-        def __init__(self) -> None:
-            super().__init__()
-            # Simulate a LoRA B matrix (e.g., out_dim x r)
-            self.test_lora_B = nn.Parameter(torch.randn(8, 2))
-
-    class DummyBackend(BaseBackend):
-        """Backend stub that exposes LoRA-B gradients in the expected format."""
-
-        def __init__(self) -> None:
-            super().__init__("dummy-model")
-            self.model = DummyModel()
-
-        def load(self) -> None:  # noqa: D401
-            """No-op load for dummy backend."""
-            return
-
-        def generate(self, *args, **kwargs):
-            raise NotImplementedError
-
-        def get_logits(self, *args, **kwargs):
-            raise NotImplementedError
-        
-        def get_tokenizer(self):
-            """Dummy tokenizer accessor for testing."""
-            return None
-
-        def get_lora_gradients(
-            self,
-            prompts: Union[str, List[str]],
-            responses: Union[str, List[str]],
-            reduction: str = "none",
-        ):
-            # For testing, we ignore the actual prompts/responses and just
-            # return synthetic gradients matching the LoRA-B parameter shapes.
-            if isinstance(prompts, str):
-                batch_size = 1
-            else:
-                batch_size = len(prompts)
-
-            # Simulate k tokens per sample
-            num_tokens = 5
-
-            # Collect LoRA-B params
-            lora_b_params = {
-                name: p
-                for name, p in self.model.named_parameters()
-                if "lora_b" in name.lower() or "lora_B" in name
-            }
-            # If our simple model doesn't follow that naming, just use the test param
-            if not lora_b_params:
-                lora_b_params = {
-                    "test_lora_B": self.model.test_lora_B,
-                }
-
-            def make_grad_dict():
-                out: Dict[str, np.ndarray] = {}
-                for name, p in lora_b_params.items():
-                    shape = p.shape  # e.g., (8, 2)
-                    g = np.random.randn(num_tokens, *shape).astype(np.float32)
-                    out[name] = g
-                return out
-
-            if reduction == "none":
-                if batch_size == 1:
-                    return make_grad_dict()
-                else:
-                    return [make_grad_dict() for _ in range(batch_size)]
-            else:
-                raise NotImplementedError("This dummy backend only supports reduction='none'.")
+    from rl_onoff.backends import create_backend
+    from rl_onoff.backends.config import BackendConfig
 
     print("=" * 60)
-    print("Testing LoraBGradientProjector with DummyBackend")
+    print("Testing LoraBGradientProjector with HuggingFaceBackend")
     print("=" * 60)
 
-    dummy_backend = DummyBackend()
-    dummy_backend.load()
+    # Configure a small HF model with LoRA adapters.
+    # You can change model_name to any causal LM you have locally / can download.
+    model_name = "Qwen/Qwen2.5-0.5B"
+
+    backend_cfg = BackendConfig.from_dict({
+        "backend_type": "huggingface",
+        "model_name": model_name,
+        "backend_specific": {
+            "device": "cuda" if torch.cuda.is_available() else "cpu",
+            "lora_config": {
+                "r": 1,
+                "lora_alpha": 32,
+                # Apply LoRA to typical attention + MLP projection modules
+                "target_modules": [
+                    "q_proj", "k_proj", "v_proj", "o_proj",
+                    "gate_proj", "up_proj", "down_proj",
+                ],
+                "lora_dropout": 0.1,
+            },
+        },
+    })
+
+    backend = create_backend(backend_cfg)
+    backend.load()
 
     projector = LoraBGradientProjector(
-        backend=dummy_backend,
-        proj_dim=4,
-        device="cpu",
-        use_cuda_projector=False,
+        backend=backend,
+        proj_dim=16,
+        device="cuda" if torch.cuda.is_available() else "cpu",
+        use_cuda_projector=False,  # set True if you have fast_jl installed
     )
 
     prompts = ["What is 2+2?"]
@@ -322,5 +271,4 @@ if __name__ == "__main__":
 
     projected = projector.compute_and_project(prompts, responses)
     print(f"Projected token gradients shape: {projected[0].shape} (k x proj_dim)")
-
 
