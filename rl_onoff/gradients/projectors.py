@@ -534,20 +534,49 @@ if __name__ == "__main__":
     # Optional CUDA / fast_jl smoke test (only runs if CUDA and fast_jl are available)
     if torch.cuda.is_available():
         print("\n" + "=" * 60)
-        print("Testing CudaProjector (if fast_jl is installed)")
+        print("Testing CudaProjector similarity preservation (high dimension)")
         print("=" * 60)
         try:
+            import torch.nn.functional as F
+
+            # Original high-dimensional space: 8192 * 64
+            orig_dim = 8192 * 64  # 524,288
+            proj_dim_cuda = 8192  # must be multiple of 512 for fast_jl
+            batch_size_cuda = 16  # number of vectors (including query)
+
+            x = torch.randn(batch_size_cuda, orig_dim, device="cuda")
+            x = F.normalize(x, dim=1)
+
+            # Choose a query vector (e.g., first one)
+            q_idx = 0
+            q = x[q_idx : q_idx + 1]
+            sims_orig = F.cosine_similarity(q, x, dim=1)
+
             cuda_proj = CudaProjector(
-                grad_dim=grad_dim,
-                proj_dim=proj_dim,
+                grad_dim=orig_dim,
+                proj_dim=proj_dim_cuda,
                 seed=123,
                 proj_type=ProjectionType.rademacher,
                 device="cuda",
-                max_batch_size=8,
+                max_batch_size=batch_size_cuda,
             )
-            grads_cuda = grads.to("cuda")
-            projected_cuda = cuda_proj.project(grads_cuda, model_id=0)
-            print(f"CudaProjector output shape: {projected_cuda.shape}")
-        except Exception as e:  # noqa: BLE001
-            print(f"Skipping CudaProjector test due to error: {e}")
+            x_proj = cuda_proj.project(x, model_id=0)
+            x_proj = F.normalize(x_proj, dim=1)
+            sims_proj = F.cosine_similarity(x_proj[q_idx : q_idx + 1], x_proj, dim=1)
 
+            k = 5
+            # Exclude self (index 0) when computing neighbors
+            def topk_neighbors(s):
+                vals, idx = torch.topk(s, k + 1)
+                return idx[1:].tolist()
+
+            top_orig = topk_neighbors(sims_orig)
+            top_proj = topk_neighbors(sims_proj)
+
+            overlap = len(set(top_orig) & set(top_proj))
+            print(f"Top-{k} neighbors in original space: {top_orig}")
+            print(f"Top-{k} neighbors in projected space: {top_proj}")
+            print(f"Overlap in top-{k} neighbors: {overlap}/{k}")
+
+        except Exception as e:  # noqa: BLE001
+            print(f"Skipping CudaProjector similarity test due to error: {e}")
