@@ -677,7 +677,7 @@ if __name__ == "__main__":
             "device": "cuda" if torch.cuda.is_available() else "cpu",
             "lora_config": {
                 "r": 1,  # LoRA rank
-                "lora_alpha": 32,  # LoRA alpha scaling factor
+                "lora_alpha": 1,  # LoRA alpha scaling factor
                 # Apply LoRA to all linear layers in attention and MLP
                 # For Qwen models, these are the typical module names:
                 "target_modules": [
