@@ -66,7 +66,6 @@ class ProjectionType(str, Enum):
 class AbstractProjector(ABC):
     """Base class for all projectors."""
 
-    @abstractmethod
     def __init__(
         self,
         grad_dim: int,
@@ -89,7 +88,6 @@ class AbstractProjector(ABC):
         self.proj_type = proj_type
         self.device = device
 
-    @abstractmethod
     def project(self, grads: Union[Dict[str, Tensor], Tensor], model_id: int) -> Tensor:
         """Project a batch of gradients.
 
