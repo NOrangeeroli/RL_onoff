@@ -14,6 +14,7 @@ from enum import Enum
 from typing import Union, Dict, List, Any
 import math
 
+import numpy as np
 import torch
 from torch import Tensor
 
@@ -191,6 +192,8 @@ class BasicSingleBlockProjector(AbstractProjector):
             self.proj_matrix -= 1.0
         else:
             raise KeyError(f"Projection type {self.proj_type} not recognized.")
+        # Scale by 1/sqrt(k) to approximate JL isotropy (k = proj_dim)
+        self.proj_matrix /= math.sqrt(self.proj_dim)
 
     def project(self, grads: Union[Dict[str, Tensor], Tensor], model_id: int) -> Tensor:
         if isinstance(grads, dict):
@@ -278,6 +281,97 @@ class BasicProjector(AbstractProjector):
             self.proj_matrix -= 1.0
         else:
             raise KeyError(f"Projection type {self.proj_type} not recognized.")
+        # Scale by 1/sqrt(k) to approximate JL isotropy (k = total proj_dim)
+        self.proj_matrix /= math.sqrt(self.proj_dim)
+
+
+# ---------------------------------------------------------------------------
+# Johnson–Lindenstrauss style sanity checks for projectors (CPU, BasicProjector)
+# ---------------------------------------------------------------------------
+
+
+def jl_min_k(n: int, eps: float) -> int:
+    """Minimum JL dimension k for n points and distortion eps (theoretical bound)."""
+    return int(math.ceil(4 * math.log(n) / (eps ** 2 / 2.0 - eps ** 3 / 3.0)))
+
+
+def sanity_checks_projector(
+    n: int,
+    d: int,
+    k: int,
+    eps: float = 0.2,
+    pairs: int = 20_000,
+    seed: int = 0,
+    proj_type: ProjectionType = ProjectionType.rademacher,
+    device: Union[str, torch.device] = "cpu",
+) -> None:
+    """Run JL-style sanity checks for BasicProjector on random Gaussian data.
+
+    This mirrors the numpy reference code:
+      - checks output shape
+      - checks approximate isotropy of P^T P
+      - checks norm preservation per point
+      - checks pairwise distance distortions on random pairs
+    """
+    device = torch.device(device)
+    rng = torch.Generator(device=device).manual_seed(seed)
+
+    # Random Gaussian data X ~ N(0, I_d)
+    X = torch.randn(n, d, generator=rng, device=device)
+
+    # Use BasicProjector with a single block (block_size == k) to get an explicit P
+    proj = BasicProjector(
+        grad_dim=d,
+        proj_dim=k,
+        seed=seed,
+        proj_type=proj_type,
+        device=device,
+        block_size=k,
+    )
+    Y = proj.project(X, model_id=0)  # (n, k)
+
+    print("=== Sanity checks for BasicProjector ===")
+    print(f"n={n}, d={d}, k={k}, eps={eps}, proj_type={proj_type}")
+
+    # A) shape check
+    assert Y.shape == (n, k), f"Y shape mismatch: got {Y.shape}, expected {(n, k)}"
+    print("Shape check passed:", Y.shape)
+
+    # B) Isotropy-ish check: P^T P ≈ I_k
+    # BasicProjector.proj_matrix is of shape (d, k) since block_size == k
+    P = proj.proj_matrix  # (d, k)
+    G = P.t() @ P  # (k, k)
+    diag = torch.diag(G)
+    diag_err = (diag - 1.0).abs().mean().item()
+    offdiag = G - torch.diag(diag)
+    offdiag_mean = offdiag.abs().sum().item() / (k * k - k)
+    print("mean |diag(P^T P) - 1|:", diag_err)
+    print("mean |offdiag(P^T P)|:", offdiag_mean)
+
+    # C) Norm ratios on random rows
+    xnorm2 = (X * X).sum(dim=1)
+    ynorm2 = (Y * Y).sum(dim=1)
+    mask = xnorm2 > 0
+    ratios = (ynorm2[mask] / xnorm2[mask]).detach().cpu().numpy()
+    qs = np.quantile(ratios, [0.01, 0.1, 0.5, 0.9, 0.99])
+    print("norm ratio quantiles (Y^2 / X^2):", qs)
+
+    # D) Pairwise distortion on sampled pairs
+    rng_pairs = torch.Generator(device=device).manual_seed(seed + 1)
+    idx_i = torch.randint(0, n, (pairs,), generator=rng_pairs, device=device)
+    idx_j = torch.randint(0, n, (pairs,), generator=rng_pairs, device=device)
+
+    dx = X[idx_i] - X[idx_j]
+    dy = Y[idx_i] - Y[idx_j]
+    dist_x = dx.norm(dim=1)
+    dist_y = dy.norm(dim=1)
+    ok = dist_x > 1e-12
+    distort = (dist_y[ok] / dist_x[ok]).detach().cpu().numpy()
+
+    qs_dist = np.quantile(distort, [0.01, 0.1, 0.5, 0.9, 0.99])
+    frac_in = np.mean((distort >= 1 - eps) & (distort <= 1 + eps))
+    print("pairwise distortion quantiles (||Px-Py|| / ||x-y||):", qs_dist)
+    print(f"fraction within [1±eps] (eps={eps}):", frac_in)
 
     def project(self, grads: Union[Dict[str, Tensor], Tensor], model_id: int) -> Tensor:
         if isinstance(grads, dict):
@@ -495,19 +589,37 @@ class ChunkedCudaProjector:
 
 
 if __name__ == "__main__":
-    """Simple smoke tests for projector implementations."""
+    """Simple smoke tests and sanity checks for projector implementations."""
 
     print("=" * 60)
-    print("Testing BasicProjector with random gradients")
+    print("Sanity checks for BasicProjector (JL-style)")
+    print("=" * 60)
+    n = 2000
+    d = 2000
+    eps = 0.2
+    k = jl_min_k(n, eps)
+    print(f"Using n={n}, d={d}, k={k} (jl_min_k)")
+    sanity_checks_projector(
+        n=n,
+        d=d,
+        k=k,
+        eps=eps,
+        pairs=20_000,
+        seed=123,
+        proj_type=ProjectionType.rademacher,
+        device="cpu",
+    )
+
+    # Simple shape and vectorize checks
+    print("\n" + "=" * 60)
+    print("Basic shape and vectorize tests")
     print("=" * 60)
 
     grad_dim = 1024
     proj_dim = 512
     batch_size = 3
 
-    # Random gradients on CPU
     grads = torch.randn(batch_size, grad_dim)
-
     basic_proj = BasicProjector(
         grad_dim=grad_dim,
         proj_dim=proj_dim,
