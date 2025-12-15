@@ -492,7 +492,7 @@ class CudaProjector(AbstractProjector):
         try:
             result = fn(
                 grads, self.proj_dim, self.seed + int(1e4) * model_id, self.num_sms
-            ) / torch.sqrt(self.proj_dim)
+            ) / math.sqrt(self.proj_dim)
         except RuntimeError as e:
             if "CUDA error: too many resources requested for launch" in str(e):
                 raise RuntimeError(
