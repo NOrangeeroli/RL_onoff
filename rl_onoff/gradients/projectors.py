@@ -398,6 +398,102 @@ class CudaProjector(AbstractProjector):
         return result
 
 
+# ---------------------------------------------------------------------------
+# ChunkedCudaProjector (optional helper for very large parameter vectors)
+# ---------------------------------------------------------------------------
+
+
+class ChunkedCudaProjector:
+    """Chunked wrapper around multiple CudaProjectors for very large grad_dim.
+
+    This is useful when a single CudaProjector would require too much memory
+    to handle all parameters at once. Instead, we split the gradient vector
+    into chunks and project each chunk with its own CudaProjector.
+    """
+
+    def __init__(
+        self,
+        projector_per_chunk: List[CudaProjector],
+        max_chunk_size: int,
+        params_per_chunk: List[int],
+        feat_bs: int,
+        device: torch.device,
+        dtype: torch.dtype,
+    ) -> None:
+        self.projector_per_chunk = projector_per_chunk
+        self.proj_dim = self.projector_per_chunk[0].proj_dim
+        self.proj_type = self.projector_per_chunk[0].proj_type
+        self.params_per_chunk = params_per_chunk
+
+        self.max_chunk_size = max_chunk_size
+        self.feat_bs = feat_bs
+        self.device = device
+        self.dtype = dtype
+        self.input_allocated = False
+
+    def allocate_input(self) -> None:
+        if self.input_allocated:
+            return
+
+        self.ch_input = ch.zeros(
+            size=(self.feat_bs, self.max_chunk_size),
+            device=self.device,
+            dtype=self.dtype,
+        )
+
+        self.input_allocated = True
+
+    def free_memory(self) -> None:
+        if not self.input_allocated:
+            return
+
+        del self.ch_input
+        self.input_allocated = False
+
+    def project(self, grads: Dict[str, Tensor], model_id: int) -> Tensor:
+        """Project a dict of parameter tensors using multiple CUDA projectors."""
+        self.allocate_input()
+        ch_output = ch.zeros(
+            size=(self.feat_bs, self.proj_dim), device=self.device, dtype=self.dtype
+        )
+        pointer = 0
+        projector_index = 0
+
+        # Iterate over params, chunking by max_chunk_size
+        for _, p in grads.items():
+            if len(p.shape) < 2:
+                p_flat = p.data.unsqueeze(-1)
+            else:
+                p_flat = p.data.flatten(start_dim=1)
+
+            param_size = p_flat.size(1)
+            if pointer + param_size > self.max_chunk_size:
+                assert pointer == self.params_per_chunk[projector_index]
+                ch_output.add_(
+                    self.projector_per_chunk[projector_index].project(
+                        self.ch_input[:, :pointer].contiguous(),
+                        model_id=model_id,
+                    )
+                )
+                pointer = 0
+                projector_index += 1
+
+            actual_bs = min(self.ch_input.size(0), p_flat.size(0))
+            self.ch_input[:actual_bs, pointer : pointer + param_size].copy_(p_flat)
+            pointer += param_size
+
+        # Project remaining items
+        assert pointer == self.params_per_chunk[projector_index]
+        ch_output[:actual_bs].add_(
+            self.projector_per_chunk[projector_index].project(
+                self.ch_input[:actual_bs, :pointer].contiguous(),
+                model_id=model_id,
+            )
+        )
+
+        return ch_output[:actual_bs]
+
+
 if __name__ == "__main__":
     """Simple smoke tests for projector implementations."""
 
