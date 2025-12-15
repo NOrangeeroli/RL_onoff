@@ -97,16 +97,8 @@ class HuggingFaceBackend(BaseBackend):
             print(f"Moving model to device: {self.device}")
             self.model = self.model.to(self.device)
         
-        # Wrap model with DataParallel for multi-GPU data parallelism
-        # This splits batches across GPUs (each GPU processes different prompts)
-        if "device_map" not in model_kwargs and torch.cuda.device_count() > 1:
-            print(f"Wrapping model with DataParallel for {torch.cuda.device_count()} GPUs")
-            print("  Each GPU will process different prompts in the batch")
-            self.model = torch.nn.DataParallel(self.model)
-            # Print actual devices that will be used
-            devices_used = [f"cuda:{i}" for i in range(torch.cuda.device_count())]
-            print(f"  Devices used for generation: {devices_used}")
-        elif "device_map" in model_kwargs:
+        # Print device information
+        if "device_map" in model_kwargs:
             # When using device_map, print the actual device mapping
             if hasattr(self.model, 'hf_device_map'):
                 print(f"  Model device mapping: {self.model.hf_device_map}")
@@ -148,13 +140,11 @@ class HuggingFaceBackend(BaseBackend):
             truncation=True,
         )
         # Determine target device for inputs
-        # If using DataParallel, inputs should go to the first GPU (cuda:0)
-        # DataParallel will automatically distribute across GPUs
-        if isinstance(self.model, torch.nn.DataParallel):
-            target_device = "cuda:0"
+        # If using device_map, find the device of the embedding layer
+        if hasattr(self.model, 'hf_device_map') and self.model.get_input_embeddings() is not None:
+            target_device = next(self.model.get_input_embeddings().parameters()).device
         else:
             target_device = self.device
-        
         inputs = {k: v.to(target_device) for k, v in inputs.items()}
 
         # Prepare generation kwargs
@@ -255,12 +245,11 @@ class HuggingFaceBackend(BaseBackend):
             truncation=True,
         )
         # Determine target device for inputs
-        # If using DataParallel, inputs should go to the first GPU (cuda:0)
-        if isinstance(self.model, torch.nn.DataParallel):
-            target_device = "cuda:0"
+        # If using device_map, find the device of the embedding layer
+        if hasattr(self.model, 'hf_device_map') and self.model.get_input_embeddings() is not None:
+            target_device = next(self.model.get_input_embeddings().parameters()).device
         else:
             target_device = self.device
-        
         full_inputs = {k: v.to(target_device) for k, v in full_inputs.items()}
 
         # Tokenize prompts separately to get prompt lengths
