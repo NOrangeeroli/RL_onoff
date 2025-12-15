@@ -9,7 +9,7 @@ Implements:
 - ChunkedCudaProjector
 """
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from enum import Enum
 from typing import Union, Dict, List, Any
 import math
@@ -587,6 +587,66 @@ class ChunkedCudaProjector:
 
         return ch_output[:actual_bs]
 
+def sanity_checks_cuda_projector(
+    n: int,
+    d: int,
+    k: int,
+    eps: float = 0.2,
+    pairs: int = 20_000,
+    seed: int = 0,
+    proj_type: ProjectionType = ProjectionType.rademacher,
+) -> None:
+    """JL-style sanity checks for CudaProjector on random Gaussian data."""
+    if not torch.cuda.is_available():
+        print("CUDA not available; skipping CudaProjector sanity checks.")
+        return
+
+    device = torch.device("cuda")
+    rng = torch.Generator(device=device).manual_seed(seed)
+
+    # X ~ N(0, I_d)
+    X = torch.randn(n, d, generator=rng, device=device)
+
+    proj = CudaProjector(
+        grad_dim=d,
+        proj_dim=k,
+        seed=seed,
+        proj_type=proj_type,
+        device=device,
+        max_batch_size=min(32, n),
+    )
+    Y = proj.project(X, model_id=0)  # (n, k)
+
+    print("=== Sanity checks for CudaProjector ===")
+    print(f"n={n}, d={d}, k={k}, eps={eps}, proj_type={proj_type}")
+
+    # A) shape check
+    assert Y.shape == (n, k), f"Y shape mismatch: got {Y.shape}, expected {(n, k)}"
+    print("Shape check passed:", Y.shape)
+
+    # B) Norm ratios per point
+    xnorm2 = (X * X).sum(dim=1)
+    ynorm2 = (Y * Y).sum(dim=1)
+    mask = xnorm2 > 0
+    ratios = (ynorm2[mask] / xnorm2[mask]).detach().cpu().numpy()
+    print("norm ratio quantiles (Y^2 / X^2):", np.quantile(ratios, [0.01, 0.1, 0.5, 0.9, 0.99]))
+
+    # C) Pairwise distortion on sampled pairs
+    rng_pairs = torch.Generator(device=device).manual_seed(seed + 1)
+    idx_i = torch.randint(0, n, (pairs,), generator=rng_pairs, device=device)
+    idx_j = torch.randint(0, n, (pairs,), generator=rng_pairs, device=device)
+
+    dx = X[idx_i] - X[idx_j]
+    dy = Y[idx_i] - Y[idx_j]
+    dist_x = dx.norm(dim=1)
+    dist_y = dy.norm(dim=1)
+    ok = dist_x > 1e-12
+    distort = (dist_y[ok] / dist_x[ok]).detach().cpu().numpy()
+
+    qs_dist = np.quantile(distort, [0.01, 0.1, 0.5, 0.9, 0.99])
+    frac_in = np.mean((distort >= 1 - eps) & (distort <= 1 + eps))
+    print("pairwise distortion quantiles (||Px-Py|| / ||x-y||):", qs_dist)
+    print(f"fraction within [1±eps] (eps={eps}):", frac_in)
 
 if __name__ == "__main__":
     """Simple smoke tests and sanity checks for projector implementations."""
@@ -650,6 +710,21 @@ if __name__ == "__main__":
         print("=" * 60)
         try:
             import torch.nn.functional as F
+            
+            n_cuda = 2000
+            d_cuda = 8192 * 64  # your large dimension
+            eps_cuda = 0.2
+            k_cuda = 8192       # multiple of 512 for fast_jl
+            sanity_checks_cuda_projector(
+                n=n_cuda,
+                d=d_cuda,
+                k=k_cuda,
+                eps=eps_cuda,
+                pairs=20_000,
+                seed=42,
+                proj_type=ProjectionType.rademacher,
+            )
+            
 
             # Original high-dimensional space: 8192 * 64
             orig_dim = 8192 * 64  # 524,288
