@@ -848,7 +848,7 @@ if __name__ == "__main__":
             # Original high-dimensional space: 8192 * 64
             orig_dim = 8192 * 64  # 524,288
             proj_dim_cuda = 8192  # must be multiple of 512 for fast_jl
-            batch_size_cuda = 16  # number of vectors (including query)
+            batch_size_cuda = 128  # number of vectors (including query)
 
             x = torch.randn(batch_size_cuda, orig_dim, device="cuda")
 
