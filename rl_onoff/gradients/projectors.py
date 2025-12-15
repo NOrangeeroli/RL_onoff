@@ -534,7 +534,7 @@ if __name__ == "__main__":
     # Optional CUDA / fast_jl smoke test (only runs if CUDA and fast_jl are available)
     if torch.cuda.is_available():
         print("\n" + "=" * 60)
-        print("Testing CudaProjector similarity preservation (high dimension)")
+        print("Testing CudaProjector L2 distance preservation (high dimension)")
         print("=" * 60)
         try:
             import torch.nn.functional as F
@@ -545,12 +545,12 @@ if __name__ == "__main__":
             batch_size_cuda = 16  # number of vectors (including query)
 
             x = torch.randn(batch_size_cuda, orig_dim, device="cuda")
-            x = F.normalize(x, dim=1)
 
             # Choose a query vector (e.g., first one)
             q_idx = 0
             q = x[q_idx : q_idx + 1]
-            sims_orig = F.cosine_similarity(q, x, dim=1)
+            # L2 distances in original space
+            dists_orig = torch.cdist(q, x).squeeze(0)
 
             cuda_proj = CudaProjector(
                 grad_dim=orig_dim,
@@ -561,28 +561,30 @@ if __name__ == "__main__":
                 max_batch_size=batch_size_cuda,
             )
             x_proj = cuda_proj.project(x, model_id=0)
-            x_proj = F.normalize(x_proj, dim=1)
-            sims_proj = F.cosine_similarity(x_proj[q_idx : q_idx + 1], x_proj, dim=1)
+            # L2 distances in projected space
+            dists_proj = F.pairwise_distance(
+                x_proj[q_idx : q_idx + 1].expand_as(x_proj), x_proj, p=2
+            )
 
             k = 5
 
-            # Exclude self (index 0) when computing neighbors
-            def topk_with_scores(s: torch.Tensor):
-                vals, idx = torch.topk(s, k + 1)
-                # drop self (position of q itself, assumed index 0)
+            # Exclude self (index 0) when computing nearest neighbors by smallest L2 distance
+            def topk_with_dists(d: torch.Tensor):
+                vals, idx = torch.topk(d, k + 1, largest=False)
+                # drop self (distance 0 at index 0)
                 return idx[1:], vals[1:]
 
-            idx_orig, vals_orig = topk_with_scores(sims_orig)
-            idx_proj, vals_proj = topk_with_scores(sims_proj)
+            idx_orig, vals_orig = topk_with_dists(dists_orig)
+            idx_proj, vals_proj = topk_with_dists(dists_proj)
 
             top_orig = idx_orig.tolist()
             top_proj = idx_proj.tolist()
 
             overlap = len(set(top_orig) & set(top_proj))
-            print(f"Top-{k} neighbors in original space: {top_orig}")
-            print(f"Top-{k} cosine similarities (original): {vals_orig.tolist()}")
-            print(f"Top-{k} neighbors in projected space: {top_proj}")
-            print(f"Top-{k} cosine similarities (projected): {vals_proj.tolist()}")
+            print(f"Top-{k} nearest neighbors (original space) indices: {top_orig}")
+            print(f"Top-{k} L2 distances (original): {vals_orig.tolist()}")
+            print(f"Top-{k} nearest neighbors (projected space) indices: {top_proj}")
+            print(f"Top-{k} L2 distances (projected): {vals_proj.tolist()}")
             print(f"Overlap in top-{k} neighbors: {overlap}/{k}")
 
         except Exception as e:  # noqa: BLE001
