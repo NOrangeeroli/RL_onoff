@@ -612,7 +612,7 @@ def sanity_checks_cuda_projector(
         seed=seed,
         proj_type=proj_type,
         device=device,
-        max_batch_size=min(32, n),
+        max_batch_size=32,
     )
     Y = proj.project(X, model_id=0)  # (n, k)
 
