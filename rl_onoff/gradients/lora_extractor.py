@@ -251,6 +251,10 @@ if __name__ == "__main__":
 
         def get_logits(self, *args, **kwargs):
             raise NotImplementedError
+        
+        def get_tokenizer(self):
+            """Dummy tokenizer accessor for testing."""
+            return None
 
         def get_lora_gradients(
             self,
