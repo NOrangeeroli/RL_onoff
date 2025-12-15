@@ -578,11 +578,13 @@ if __name__ == "__main__":
     # Replace with your preferred model name
     from rl_onoff.backends.config import BackendConfig
     from rl_onoff.backends import create_backend
-    config = BackendConfig(
-        backend_type="huggingface",
-        model_name="meta-llama/Llama-3.2-1B",  # Replace with your model
-        device="cuda"  # Use "cuda" if GPU is available
-    )
+    config = BackendConfig.from_dict({
+        "backend_type": "huggingface",
+        "model_name": "meta-llama/Llama-3.2-1B",  # Replace with your model
+        "backend_specific": {
+            "device": "cuda" if torch.cuda.is_available() else "cpu"  # Use "cuda" if GPU is available
+        }
+    })
     backend = create_backend(config)
     
     # Generate text from a single prompt
