@@ -713,7 +713,7 @@ if __name__ == "__main__":
             n_cuda = 20
             d_cuda = 8192 * 64  # your large dimension
             eps_cuda = 0.2
-            k_cuda = 8192       # multiple of 512 for fast_jl
+            k_cuda = 512       # multiple of 512 for fast_jl
             sanity_checks_cuda_projector(
                 n=n_cuda,
                 d=d_cuda,
