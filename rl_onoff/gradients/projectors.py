@@ -565,17 +565,24 @@ if __name__ == "__main__":
             sims_proj = F.cosine_similarity(x_proj[q_idx : q_idx + 1], x_proj, dim=1)
 
             k = 5
-            # Exclude self (index 0) when computing neighbors
-            def topk_neighbors(s):
-                vals, idx = torch.topk(s, k + 1)
-                return idx[1:].tolist()
 
-            top_orig = topk_neighbors(sims_orig)
-            top_proj = topk_neighbors(sims_proj)
+            # Exclude self (index 0) when computing neighbors
+            def topk_with_scores(s: torch.Tensor):
+                vals, idx = torch.topk(s, k + 1)
+                # drop self (position of q itself, assumed index 0)
+                return idx[1:], vals[1:]
+
+            idx_orig, vals_orig = topk_with_scores(sims_orig)
+            idx_proj, vals_proj = topk_with_scores(sims_proj)
+
+            top_orig = idx_orig.tolist()
+            top_proj = idx_proj.tolist()
 
             overlap = len(set(top_orig) & set(top_proj))
             print(f"Top-{k} neighbors in original space: {top_orig}")
+            print(f"Top-{k} cosine similarities (original): {vals_orig.tolist()}")
             print(f"Top-{k} neighbors in projected space: {top_proj}")
+            print(f"Top-{k} cosine similarities (projected): {vals_proj.tolist()}")
             print(f"Overlap in top-{k} neighbors: {overlap}/{k}")
 
         except Exception as e:  # noqa: BLE001
