@@ -663,7 +663,7 @@ if __name__ == "__main__":
         d=d,
         k=k,
         eps=eps,
-        pairs=20_000,
+        pairs=200,
         seed=123,
         proj_type=ProjectionType.rademacher,
         device="cpu",
@@ -710,7 +710,7 @@ if __name__ == "__main__":
         try:
             import torch.nn.functional as F
             
-            n_cuda = 20
+            n_cuda = 2000
             d_cuda = 8192 * 64  # your large dimension
             eps_cuda = 0.2
             k_cuda = 512       # multiple of 512 for fast_jl
@@ -719,7 +719,7 @@ if __name__ == "__main__":
                 d=d_cuda,
                 k=k_cuda,
                 eps=eps_cuda,
-                pairs=20_000,
+                pairs=200,
                 seed=42,
                 proj_type=ProjectionType.rademacher,
             )
