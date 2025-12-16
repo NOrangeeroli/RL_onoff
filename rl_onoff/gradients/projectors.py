@@ -806,7 +806,7 @@ if __name__ == "__main__":
             n_cuda = 2000
             d_cuda = 8192 * 64  # your large dimension
             eps_cuda = 0.2
-            k_cuda = 512       # multiple of 512 for fast_jl
+            k_cuda = 512 * 16       # multiple of 512 for fast_jl
             sanity_checks_cuda_projector(
                 n=n_cuda,
                 d=d_cuda,
@@ -876,7 +876,7 @@ if __name__ == "__main__":
         try:
             n_chunked = 2000
             d_chunked = 8192 * 64  # Large dimension that needs chunking
-            k_chunked = 512  # Multiple of 512 for fast_jl
+            k_chunked = 512 * 16  # Multiple of 512 for fast_jl
             max_chunk_size = 8192 * 8  # Split into chunks of this size
             sanity_checks_chunked_cuda_projector(
                 n=n_chunked,
