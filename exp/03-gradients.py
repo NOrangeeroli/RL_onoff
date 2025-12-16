@@ -248,7 +248,7 @@ def main(
                 prompt_token_ids = backend.encode(prompt)
                 prompt_len = len(prompt_token_ids)
 
-                token_ids = backend.encode(response)
+                token_ids = backend.encode(response)[:max_prompt_len-prompt_len]
                 num_tokens = len(token_ids)
 
                 # Split response into chunks in token space to avoid OOM:
@@ -265,8 +265,6 @@ def main(
                     # exceed max_prompt_len, stop processing further chunks.
                     total_len_for_chunk = prompt_len + end
                     print(f"total_len_for_chunk: {total_len_for_chunk}")
-                    if total_len_for_chunk > max_prompt_len:
-                        break
 
                     # Decode current chunk and all previous chunks back to text
                     chunk_response = tokenizer.decode(
