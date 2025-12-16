@@ -212,11 +212,11 @@ def main():
                 st.stop()
             
             data = load_distributions(str(json_file))
-            # Store distributions file path for on-demand loading
-            if "_distributions_file" not in data:
-                dist_filename = data.get("distributions_file", "distributions.npz")
-                distributions_file_path = json_file.parent / dist_filename
-                data["_distributions_file"] = str(distributions_file_path)
+            # Store distributions file path for on-demand loading (needed for load_single_distribution)
+            # The imported function doesn't set this, so we add it here
+            dist_filename = data.get("distributions_file", "distributions.npz")
+            distributions_file_path = json_file.parent / dist_filename
+            data["_distributions_file"] = str(distributions_file_path)
     except Exception as e:
         st.error(f"Error loading data: {e}")
         import traceback
