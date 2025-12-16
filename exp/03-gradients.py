@@ -234,7 +234,8 @@ def main(
         # Process each sample for this example
         for sample in samples:
             sample_id = sample.get("sample_id", 0)
-            response = sample.get("response", "")
+            response = sample.get("response", "") 
+            print(f"sample_id: {sample_id}")
             
             if not response:
                 continue
