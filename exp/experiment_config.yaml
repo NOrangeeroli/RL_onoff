@@ -127,7 +127,7 @@ global:
     proj_dim: 8192  # Projection dimension (d)
     device: "cuda"  # Device for projection ("cuda" or "cpu")
     proj_type: "rademacher"  # Projection type: "normal" or "rademacher"
-    use_cuda_projector: false  # Use CUDA projector (requires fast_jl)
+    use_cuda_projector: true  # Use CUDA projector (requires fast_jl)
     block_size: 100  # Block size for BasicProjector (if used)
     seed: 0  # Random seed for projector
     cuda_max_batch_size: 32  # Max batch size for CudaProjector (if used)
