@@ -601,38 +601,80 @@ class ChunkedCudaProjector:
 
         return ch_output[:actual_bs]
 
-def sanity_checks_cuda_projector(
+
+def sanity_checks_chunked_cuda_projector(
     n: int,
     d: int,
     k: int,
+    max_chunk_size: int,
     eps: float = 0.2,
     pairs: int = 20_000,
     seed: int = 0,
     proj_type: ProjectionType = ProjectionType.rademacher,
 ) -> None:
-    """JL-style sanity checks for CudaProjector on random Gaussian data."""
+    """JL-style sanity checks for ChunkedCudaProjector on random Gaussian data.
+    
+    This function sets up a ChunkedCudaProjector by splitting the dimension d
+    into chunks of size max_chunk_size, then runs similar checks as the other
+    projector sanity checks.
+    """
     if not torch.cuda.is_available():
-        print("CUDA not available; skipping CudaProjector sanity checks.")
+        print("CUDA not available; skipping ChunkedCudaProjector sanity checks.")
         return
 
     device = torch.device("cuda")
     rng = torch.Generator(device=device).manual_seed(seed)
+    dtype = torch.float32
 
-    # X ~ N(0, I_d)
-    X = torch.randn(n, d, generator=rng, device=device)
+    # X ~ N(0, I_d) - generate as a single tensor first
+    X = torch.randn(n, d, generator=rng, device=device, dtype=dtype)
 
-    proj = CudaProjector(
-        grad_dim=d,
-        proj_dim=k,
-        seed=seed,
-        proj_type=proj_type,
+    # Split X into chunks to create a dict of tensors (as ChunkedCudaProjector expects)
+    # We'll create chunks of size max_chunk_size
+    num_chunks = math.ceil(d / max_chunk_size)
+    params_per_chunk = []
+    projector_per_chunk = []
+    
+    for chunk_idx in range(num_chunks):
+        start_idx = chunk_idx * max_chunk_size
+        end_idx = min((chunk_idx + 1) * max_chunk_size, d)
+        chunk_size = end_idx - start_idx
+        
+        # Create a CudaProjector for this chunk
+        chunk_proj = CudaProjector(
+            grad_dim=chunk_size,
+            proj_dim=k,
+            seed=seed + chunk_idx * 1000,  # Different seed per chunk
+            proj_type=proj_type,
+            device=device,
+            max_batch_size=min(32, n),
+        )
+        projector_per_chunk.append(chunk_proj)
+        params_per_chunk.append(chunk_size)
+
+    # Create ChunkedCudaProjector
+    chunked_proj = ChunkedCudaProjector(
+        projector_per_chunk=projector_per_chunk,
+        max_chunk_size=max_chunk_size,
+        params_per_chunk=params_per_chunk,
+        feat_bs=n,
         device=device,
-        max_batch_size=32,
+        dtype=dtype,
     )
-    Y = proj.project(X, model_id=0)  # (n, k)
 
-    print("=== Sanity checks for CudaProjector ===")
-    print(f"n={n}, d={d}, k={k}, eps={eps}, proj_type={proj_type}")
+    # Convert X to dict format (split into chunks)
+    grads_dict = {}
+    for chunk_idx in range(num_chunks):
+        start_idx = chunk_idx * max_chunk_size
+        end_idx = min((chunk_idx + 1) * max_chunk_size, d)
+        grads_dict[f"param_{chunk_idx}"] = X[:, start_idx:end_idx]
+
+    # Project using ChunkedCudaProjector
+    Y = chunked_proj.project(grads_dict, model_id=0)  # (n, k)
+
+    print("=== Sanity checks for ChunkedCudaProjector ===")
+    print(f"n={n}, d={d}, k={k}, max_chunk_size={max_chunk_size}, eps={eps}, proj_type={proj_type}")
+    print(f"Number of chunks: {num_chunks}")
 
     # A) shape check
     assert Y.shape == (n, k), f"Y shape mismatch: got {Y.shape}, expected {(n, k)}"
@@ -661,6 +703,10 @@ def sanity_checks_cuda_projector(
     frac_in = np.mean((distort >= 1 - eps) & (distort <= 1 + eps))
     print("pairwise distortion quantiles (||Px-Py|| / ||x-y||):", qs_dist)
     print(f"fraction within [1±eps] (eps={eps}):", frac_in)
+
+    # Clean up
+    chunked_proj.free_memory()
+
 
 if __name__ == "__main__":
     """Simple smoke tests and sanity checks for projector implementations."""
@@ -783,3 +829,25 @@ if __name__ == "__main__":
 
         except Exception as e:  # noqa: BLE001
             print(f"Skipping CudaProjector similarity test due to error: {e}")
+
+        # Test ChunkedCudaProjector
+        print("\n" + "=" * 60)
+        print("Testing ChunkedCudaProjector (JL-style sanity checks)")
+        print("=" * 60)
+        try:
+            n_chunked = 2000
+            d_chunked = 8192 * 64  # Large dimension that needs chunking
+            k_chunked = 512  # Multiple of 512 for fast_jl
+            max_chunk_size = 8192 * 8  # Split into chunks of this size
+            sanity_checks_chunked_cuda_projector(
+                n=n_chunked,
+                d=d_chunked,
+                k=k_chunked,
+                max_chunk_size=max_chunk_size,
+                eps=0.2,
+                pairs=200,
+                seed=42,
+                proj_type=ProjectionType.rademacher,
+            )
+        except Exception as e:  # noqa: BLE001
+            print(f"Skipping ChunkedCudaProjector test due to error: {e}")
