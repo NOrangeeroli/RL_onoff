@@ -344,7 +344,7 @@ if __name__ == "__main__":
         cuda_max_batch_size = 32
     )
 
-    prompts = ["What is 2+2?"*100]
+    prompts = ["What is 2+2?"*1000]
     responses = [" 4"]
 
     # token_grads = projector.compute_token_gradients(prompts, responses)
