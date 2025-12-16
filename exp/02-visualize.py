@@ -372,9 +372,7 @@ def main():
                     )
                     top_tokens = get_top_tokens_from_topk(token_indices, token_values, requested_k)
                     
-                    # Create bar chart (will be created later with token labels)
-                    # Ensure sorted by probability (descending)
-                    top_tokens = sorted(top_tokens, key=lambda x: x[1], reverse=True)
+                    # Data is already sorted in descending order (stored that way in 01-dist.py)
                     probs = [t[1] for t in top_tokens]
                     
                     # Show details with bounds checking
@@ -443,21 +441,25 @@ def main():
                                 title=f"Token Distribution (Token {selected_token_idx})",
                                 labels={"Token": "Token", "Probability": "Probability"}
                             )
-                            # Sort bars by probability (descending)
+                            # Explicitly order bars by probability (descending) - highest on left
+                            # 'total descending' orders categories by their total values
                             fig.update_layout(
-                                xaxis={'categoryorder': 'total descending'},
+                                xaxis={
+                                    'categoryorder': 'total descending',
+                                    'type': 'category'  # Ensures categorical ordering is respected
+                                },
                                 xaxis_tickangle=-45
                             )
                             st.plotly_chart(fig, use_container_width=True)
                         except ImportError:
                             # Fallback to streamlit bar_chart
-                            # Create a dict with sorted data to preserve order
-                            chart_dict = {row["Token"]: row["Probability"] for _, row in chart_df.iterrows()}
-                            st.bar_chart(chart_dict)
+                            # Use DataFrame directly to preserve order (Streamlit respects DataFrame index order)
+                            st.bar_chart(chart_df.set_index("Token")["Probability"])
                     except ImportError:
-                        # Fallback if pandas not available - create dict sorted by value
+                        # Fallback if pandas not available - use OrderedDict to preserve sort order
+                        from collections import OrderedDict
                         sorted_data = sorted(zip(token_labels, probs), key=lambda x: x[1], reverse=True)
-                        chart_data = {label: prob for label, prob in sorted_data}
+                        chart_data = OrderedDict(sorted_data)
                         st.bar_chart(chart_data)
                         st.caption("Token labels: " + ", ".join([l for l, _ in sorted_data[:5]]) + "...")
                     
