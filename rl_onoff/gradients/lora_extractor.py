@@ -7,6 +7,7 @@ LoRA gradient extraction and projection utilities.
 """
 
 from typing import List, Dict, Tuple, Union
+import math
 
 import numpy as np
 import torch
@@ -15,6 +16,7 @@ from rl_onoff.backends.base import BaseBackend
 from rl_onoff.gradients.projectors import (
     BasicProjector,
     CudaProjector,
+    ChunkedCudaProjector,
     ProjectionType,
 )
 
@@ -36,9 +38,12 @@ class LoraBGradientProjector:
         device: Union[str, torch.device] = "cuda",
         proj_type: str = "rademacher",
         use_cuda_projector: bool = True,
+        use_chunk: bool = False,
         block_size: int = 100,
         seed: int = 0,
         cuda_max_batch_size: int = 32,
+        chunk_max_size: int = 8192 * 64,
+        chunk_feat_bs: int = 2048,
     ) -> None:
         """
         Args:
@@ -46,16 +51,22 @@ class LoraBGradientProjector:
             proj_dim: target projection dimension d.
             device: device for projector ("cuda" recommended).
             proj_type: "normal" or "rademacher".
-            use_cuda_projector: if True, use CudaProjector; else BasicProjector.
+            use_cuda_projector: if True, use CudaProjector-based projector; else BasicProjector.
+            use_chunk: if True and use_cuda_projector is True, use ChunkedCudaProjector
+                (splits the LoRA-B gradient dimension into chunks projected by multiple
+                 CudaProjectors). Ignored if use_cuda_projector is False.
             block_size: block size for BasicProjector (if used).
             seed: random seed for projector.
             cuda_max_batch_size: max batch size for CudaProjector.
+            chunk_max_size: maximum number of parameters per chunk for ChunkedCudaProjector.
+            chunk_feat_bs: maximum number of tokens (batch size) per ChunkedCudaProjector call.
         """
         self.backend = backend
         self.device = torch.device(device)
         self.proj_dim = proj_dim
         self.proj_type = ProjectionType(proj_type)
         self.seed = seed
+        self.use_chunk = bool(use_chunk)
 
         # Infer grad_dim (total number of LoRA-B parameters) and layout
         self.lora_b_param_names, self.param_shapes, self.grad_dim = (
@@ -64,14 +75,59 @@ class LoraBGradientProjector:
 
         # Initialize projector
         if use_cuda_projector:
-            self.projector = CudaProjector(
-                grad_dim=self.grad_dim,
-                proj_dim=self.proj_dim,
-                seed=self.seed,
-                proj_type=self.proj_type,
-                device=self.device,
-                max_batch_size=cuda_max_batch_size,
-            )
+            if self.use_chunk:
+                if self.device.type != "cuda":
+                    raise ValueError(
+                        "ChunkedCudaProjector requires a CUDA device. "
+                        "Set device='cuda' or disable use_chunk."
+                    )
+
+                max_size = int(chunk_max_size) if chunk_max_size is not None else self.grad_dim
+                max_size = max(1, min(max_size, self.grad_dim))
+
+                num_chunks = math.ceil(self.grad_dim / max_size)
+                projector_per_chunk = []
+                params_per_chunk: List[int] = []
+                chunk_slices: List[Tuple[int, int]] = []
+
+                for idx in range(num_chunks):
+                    start = idx * max_size
+                    end = min((idx + 1) * max_size, self.grad_dim)
+                    chunk_dim = end - start
+                    chunk_slices.append((start, end))
+                    params_per_chunk.append(chunk_dim)
+
+                    projector_per_chunk.append(
+                        CudaProjector(
+                            grad_dim=chunk_dim,
+                            proj_dim=self.proj_dim,
+                            seed=self.seed + idx * 1000,
+                            proj_type=self.proj_type,
+                            device=self.device,
+                            max_batch_size=cuda_max_batch_size,
+                        )
+                    )
+
+                self._chunk_slices = chunk_slices
+                feat_bs = int(chunk_feat_bs) if chunk_feat_bs is not None else 2048
+
+                self.projector = ChunkedCudaProjector(
+                    projector_per_chunk=projector_per_chunk,
+                    max_chunk_size=max_size,
+                    params_per_chunk=params_per_chunk,
+                    feat_bs=feat_bs,
+                    device=self.device,
+                    dtype=torch.float32,
+                )
+            else:
+                self.projector = CudaProjector(
+                    grad_dim=self.grad_dim,
+                    proj_dim=self.proj_dim,
+                    seed=self.seed,
+                    proj_type=self.proj_type,
+                    device=self.device,
+                    max_batch_size=cuda_max_batch_size,
+                )
         else:
             self.projector = BasicProjector(
                 grad_dim=self.grad_dim,
@@ -192,9 +248,32 @@ class LoraBGradientProjector:
             projected: np.ndarray (k, proj_dim)
         """
         grads_tensor = torch.from_numpy(token_grads).to(self.device)  # (k, grad_dim)
+
         with torch.no_grad():
-            projected = self.projector.project(grads_tensor, model_id=model_id)
-        return projected.cpu().numpy()
+            if isinstance(self.projector, ChunkedCudaProjector):
+                if not hasattr(self, "_chunk_slices"):
+                    raise RuntimeError(
+                        "ChunkedCudaProjector is enabled but _chunk_slices not found. "
+                        "This indicates an internal initialization error."
+                    )
+
+                k = grads_tensor.shape[0]
+                if k > self.projector.feat_bs:
+                    raise ValueError(
+                        f"Number of tokens ({k}) exceeds ChunkedCudaProjector feat_bs "
+                        f"({self.projector.feat_bs}). Increase chunk_feat_bs when "
+                        "constructing LoraBGradientProjector."
+                    )
+
+                grads_dict: Dict[str, torch.Tensor] = {}
+                for idx, (start, end) in enumerate(self._chunk_slices):
+                    grads_dict[f"chunk_{idx}"] = grads_tensor[:, start:end]
+
+                projected_tensor = self.projector.project(grads_dict, model_id=model_id)
+            else:
+                projected_tensor = self.projector.project(grads_tensor, model_id=model_id)
+
+        return projected_tensor.cpu().numpy()
 
     def compute_and_project(
         self,
@@ -260,7 +339,8 @@ if __name__ == "__main__":
         backend=backend,
         proj_dim=8192,
         device="cuda" if torch.cuda.is_available() else "cpu",
-        use_cuda_projector=False,  # set True if you have fast_jl installed
+        use_cuda_projector=True,  # set True if you have fast_jl installed
+        use_chunk=True,
     )
 
     prompts = ["What is 2+2?"]

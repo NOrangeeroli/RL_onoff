@@ -514,9 +514,37 @@ class CudaProjector(AbstractProjector):
 class ChunkedCudaProjector:
     """Chunked wrapper around multiple CudaProjectors for very large grad_dim.
 
-    This is useful when a single CudaProjector would require too much memory
-    to handle all parameters at once. Instead, we split the gradient vector
-    into chunks and project each chunk with its own CudaProjector.
+    High‑level idea
+    ----------------
+    A single :class:`CudaProjector` expects a dense 2D tensor of shape
+    ``(batch, grad_dim)`` and builds a JL projection for that entire
+    ``grad_dim``. For huge models (e.g. millions of LoRA parameters), holding
+    a single projection matrix and a single contiguous gradient buffer can be
+    memory‑prohibitive.
+
+    ``ChunkedCudaProjector`` solves this by:
+
+    - Splitting the full flattened gradient dimension into several **chunks**,
+      each of size at most ``max_chunk_size``.
+    - Constructing one :class:`CudaProjector` per chunk
+      (``projector_per_chunk``), each responsible for projecting only its
+      local slice of the parameters.
+    - Maintaining a preallocated input buffer ``ch_input`` of shape
+      ``(feat_bs, max_chunk_size)`` on the target CUDA device.
+    - During ``project()``, iterating over the parameter tensors in the input
+      ``grads`` dict, flattening them along the feature dimension, and
+      **packing** them sequentially into ``ch_input`` until the current chunk
+      is full.
+    - Once a chunk is full (or all parameters assigned to that chunk have been
+      packed), invoking the corresponding :class:`CudaProjector` on the
+      filled prefix of ``ch_input`` and **accumulating** the result into a
+      shared output buffer ``ch_output`` of shape ``(feat_bs, proj_dim)``.
+
+    At the end, the sum of all per‑chunk projected contributions in
+    ``ch_output`` is returned (sliced to the actual batch size). This design
+    lets you handle extremely large ``grad_dim`` by trading off projection
+    memory for multiple smaller CUDA kernels, while still producing a single
+    projected vector of dimension ``proj_dim`` per example.
     """
 
     def __init__(
