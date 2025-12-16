@@ -233,7 +233,7 @@ if __name__ == "__main__":
 
     # Configure a small HF model with LoRA adapters.
     # You can change model_name to any causal LM you have locally / can download.
-    model_name = "Qwen/Qwen2.5-0.5B"
+    model_name = "/data/chenyamei/pretrained_models/Qwen3-4B"
 
     backend_cfg = BackendConfig.from_dict({
         "backend_type": "huggingface",
