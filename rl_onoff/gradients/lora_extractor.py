@@ -32,10 +32,10 @@ class LoraBGradientProjector:
     def __init__(
         self,
         backend: BaseBackend,
-        proj_dim: int,
+        proj_dim: int = 8192,
         device: Union[str, torch.device] = "cuda",
         proj_type: str = "rademacher",
-        use_cuda_projector: bool = False,
+        use_cuda_projector: bool = True,
         block_size: int = 100,
         seed: int = 0,
         cuda_max_batch_size: int = 32,
@@ -97,7 +97,7 @@ class LoraBGradientProjector:
         grad_dim = 0
 
         for name, param in self.backend.model.named_parameters():
-            if "lora" in name.lower() and "lora_b" in name.lower():
+            if "lora_b" in name.lower():
                 names.append(name)
                 shapes[name] = tuple(param.shape)
                 grad_dim += param.numel()

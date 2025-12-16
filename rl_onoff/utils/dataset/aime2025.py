@@ -43,3 +43,22 @@ class AIME2025Dataset(BaseDataset):
             return str(ground_truth)
         return ""
 
+
+if __name__ == "__main__":
+    """Load and print one entry from AIME2025 dataset."""
+    try:
+        dataset = AIME2025Dataset()
+        question, answer, solution = dataset[0]
+        
+        print("=" * 60)
+        print("AIME2025 Dataset - First Entry")
+        print("=" * 60)
+        print(f"Question: {question}")
+        print(f"Answer: {answer}")
+        print(f"Solution: {solution}")
+        print("=" * 60)
+    except FileNotFoundError as e:
+        print(f"Dataset file not found: {e}")
+    except Exception as e:
+        print(f"Error loading dataset: {e}")
+

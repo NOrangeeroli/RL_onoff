@@ -13,7 +13,10 @@ class BaseDataset(ABC):
     Each dataset class should:
     1. Know the file path structure
     2. Load data using data_loader
-    3. Extract question and answer strings
+    3. Extract question, answer, and solution strings
+    
+    The dataset returns tuples of (question, answer, solution) where solution
+    may be None if not available in the data.
     """
     
     def __init__(self, data_dir: Optional[Path] = None, split: str = "test"):
@@ -64,6 +67,27 @@ class BaseDataset(ABC):
         """
         pass
     
+    def extract_solution(self, entry: Dict) -> Optional[str]:
+        """Extract solution string from a data entry.
+        
+        Tries to get solution from reward_model.ground_truth.solution.
+        Returns None if not found.
+        
+        Args:
+            entry: Dictionary entry from loaded data
+            
+        Returns:
+            Solution string or None if not available
+        """
+        reward_model = entry.get("reward_model", {})
+        if isinstance(reward_model, dict):
+            ground_truth = reward_model.get("ground_truth", {})
+            if isinstance(ground_truth, dict):
+                solution = ground_truth.get("solution")
+                if solution is not None:
+                    return str(solution)
+        return None
+    
     def load(self) -> None:
         """Load the dataset from file."""
         file_path = self.get_file_path()
@@ -78,14 +102,14 @@ class BaseDataset(ABC):
             self.load()
         return len(self._data)
     
-    def __getitem__(self, idx: int) -> Tuple[str, str]:
-        """Get a question-answer pair by index.
+    def __getitem__(self, idx: int) -> Tuple[str, str, Optional[str]]:
+        """Get a question-answer-solution triple by index.
         
         Args:
             idx: Index of the example
             
         Returns:
-            Tuple of (question, answer) strings
+            Tuple of (question, answer, solution) where solution may be None
         """
         if self._data is None:
             self.load()
@@ -93,14 +117,15 @@ class BaseDataset(ABC):
         entry = self._data[idx]
         question = self.extract_question(entry)
         answer = self.extract_answer(entry)
-        # Ensure both are strings
-        return str(question), str(answer)
+        solution = self.extract_solution(entry)
+        # Ensure question and answer are strings
+        return str(question), str(answer), solution
     
-    def get_all(self) -> List[Tuple[str, str]]:
-        """Get all question-answer pairs.
+    def get_all(self) -> List[Tuple[str, str, Optional[str]]]:
+        """Get all question-answer-solution triples.
         
         Returns:
-            List of (question, answer) tuples
+            List of (question, answer, solution) tuples where solution may be None
         """
         if self._data is None:
             self.load()
@@ -128,4 +153,15 @@ class BaseDataset(ABC):
             self.load()
         
         return [str(self.extract_answer(entry)) for entry in self._data]
+    
+    def get_solutions(self) -> List[Optional[str]]:
+        """Get all solutions.
+        
+        Returns:
+            List of solution strings (may contain None if not available)
+        """
+        if self._data is None:
+            self.load()
+        
+        return [self.extract_solution(entry) for entry in self._data]
 

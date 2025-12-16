@@ -51,3 +51,22 @@ class GSM8KLevel1Dataset(BaseDataset):
                 return str(ground_truth)
         return ""
 
+
+if __name__ == "__main__":
+    """Load and print one entry from GSM8K Level 1 dataset."""
+    try:
+        dataset = GSM8KLevel1Dataset(split="test")
+        question, answer, solution = dataset[0]
+        
+        print("=" * 60)
+        print("GSM8K Level 1 Dataset - First Entry")
+        print("=" * 60)
+        print(f"Question: {question}")
+        print(f"Answer: {answer}")
+        print(f"Solution: {solution}")
+        print("=" * 60)
+    except FileNotFoundError as e:
+        print(f"Dataset file not found: {e}")
+    except Exception as e:
+        print(f"Error loading dataset: {e}")
+
