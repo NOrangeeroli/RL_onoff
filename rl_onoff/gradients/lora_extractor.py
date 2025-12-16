@@ -344,7 +344,7 @@ if __name__ == "__main__":
     )
 
     prompts = ["What is 2+2?"]
-    responses = [" 4"*1000]
+    responses = [" 4"]
 
     token_grads = projector.compute_token_gradients(prompts, responses)
     print(f"Raw token gradients shape: {token_grads[0].shape} (k x grad_dim)")
