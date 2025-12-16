@@ -256,6 +256,7 @@ def main(
                 # previous response chunks, and the response is the current chunk.
                 projected_chunks: List[np.ndarray] = []
                 for start in range(0, num_tokens, token_chunk_size):
+                    
                     end = min(start + token_chunk_size, num_tokens)
                     chunk_token_ids = token_ids[start:end]
 
@@ -263,6 +264,7 @@ def main(
                     # (original prompt tokens + all response tokens up to `end`)
                     # exceed max_prompt_len, stop processing further chunks.
                     total_len_for_chunk = prompt_len + end
+                    print(f"total_len_for_chunk: {total_len_for_chunk}")
                     if total_len_for_chunk > max_prompt_len:
                         break
 
