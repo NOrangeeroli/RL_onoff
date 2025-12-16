@@ -131,7 +131,7 @@ global:
     block_size: 100  # Block size for BasicProjector (if used)
     seed: 0  # Random seed for projector
     cuda_max_batch_size: 32  # Max batch size for CudaProjector (if used)
-    token_chunk_size: 4096  # Maximum number of response tokens to process in a single gradient chunk.
+    token_chunk_size: 128  # Maximum number of response tokens to process in a single gradient chunk.
     max_prompt_len: 1024  # Maximum total prompt length (prompt+response tokens) when computing gradients
 
   output:
