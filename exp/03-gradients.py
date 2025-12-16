@@ -24,7 +24,7 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from rl_onoff.backends import create_backend
-from rl_onoff.gradients import LoraBGradientProjector
+from rl_onoff.gradients.lora_extractor import LoraBGradientProjector
 
 
 def load_experiment_config(config_path: Optional[str] = None) -> dict:
