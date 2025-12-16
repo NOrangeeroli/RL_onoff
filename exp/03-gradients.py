@@ -187,6 +187,9 @@ def main(
     block_size = grad_config.get("block_size", 100)
     seed = grad_config.get("seed", 0)
     cuda_max_batch_size = grad_config.get("cuda_max_batch_size", 32)
+    # Maximum number of response tokens to process in a single gradient chunk.
+    # Responses longer than this are split into multiple chunks to avoid OOM.
+    token_chunk_size = int(grad_config.get("token_chunk_size", 256))
     
     print(f"Gradient config: proj_dim={proj_dim}, device={device}, proj_type={proj_type}, "
           f"use_cuda_projector={use_cuda_projector}, seed={seed}")
@@ -234,37 +237,74 @@ def main(
             
             # Compute and project per-token LoRA-B gradients
             try:
-                # Compute projected gradients: returns List[np.ndarray] with shape (k, proj_dim)
-                projected_grads_list = projector.compute_and_project(
-                    prompts=[prompt],  # Use the formatted prompt
-                    responses=[response],
-                    model_id=0
-                )
-                
-                if len(projected_grads_list) != 1:
-                    raise ValueError(f"Expected 1 projected gradient, got {len(projected_grads_list)}")
-                
-                projected_grads = projected_grads_list[0]  # (k, proj_dim)
-                
+                tokenizer = backend.get_tokenizer()
+
+                # Tokenize the full response once to get token IDs
+                token_ids = backend.encode(response)
+                num_tokens = len(token_ids)
+
+                # Split response into chunks in token space to avoid OOM:
+                # for each chunk, the prompt is the original prompt plus all
+                # previous response chunks, and the response is the current chunk.
+                projected_chunks: List[np.ndarray] = []
+                for start in range(0, num_tokens, token_chunk_size):
+                    end = min(start + token_chunk_size, num_tokens)
+                    chunk_token_ids = token_ids[start:end]
+
+                    # Decode current chunk and all previous chunks back to text
+                    chunk_response = tokenizer.decode(
+                        chunk_token_ids,
+                        skip_special_tokens=False,
+                    )
+                    if start == 0:
+                        prev_response_text = ""
+                    else:
+                        prev_ids = token_ids[:start]
+                        prev_response_text = tokenizer.decode(
+                            prev_ids,
+                            skip_special_tokens=False,
+                        )
+
+                    chunk_prompt = prompt + prev_response_text
+
+                    projected_grads_list = projector.compute_and_project(
+                        prompts=[chunk_prompt],
+                        responses=[chunk_response],
+                        model_id=0,
+                    )
+
+                    if len(projected_grads_list) != 1:
+                        raise ValueError(
+                            f"Expected 1 projected gradient, got {len(projected_grads_list)}"
+                        )
+
+                    projected_chunks.append(projected_grads_list[0])  # (chunk_k, proj_dim)
+
+                # Concatenate all chunk gradients along the token dimension
+                if len(projected_chunks) == 0:
+                    continue
+                projected_grads = np.concatenate(projected_chunks, axis=0)  # (k, proj_dim)
+
                 # Get token strings (split the response string as it gets tokenized)
                 token_strings = get_tokenized_strings(backend, response)
-                
-                # Get token IDs
-                token_ids = backend.encode(response)
-                
+
                 # Verify alignment
                 if len(token_ids) != len(token_strings):
-                    print(f"\nWarning: Token ID count ({len(token_ids)}) != token string count ({len(token_strings)}) "
-                          f"for example {example_id}, sample {sample_id}")
-                
+                    print(
+                        f"\nWarning: Token ID count ({len(token_ids)}) != token string count ({len(token_strings)}) "
+                        f"for example {example_id}, sample {sample_id}"
+                    )
+
                 if len(token_ids) != projected_grads.shape[0]:
-                    print(f"\nWarning: Token count ({len(token_ids)}) != gradient count ({projected_grads.shape[0]}) "
-                          f"for example {example_id}, sample {sample_id}")
-                
+                    print(
+                        f"\nWarning: Token count ({len(token_ids)}) != gradient count ({projected_grads.shape[0]}) "
+                        f"for example {example_id}, sample {sample_id}"
+                    )
+
                 # Store projected gradients in compact format (will save to NPZ later)
                 grad_index = len(all_projected_gradients)
                 all_projected_gradients.append(projected_grads)
-                
+
                 sample_grad_result = {
                     "sample_id": sample_id,
                     "response": response,
@@ -276,7 +316,7 @@ def main(
                     "proj_dim": proj_dim,
                     "grad_dim": projector.grad_dim,  # Original gradient dimension before projection
                 }
-                
+
                 example_grad_results["samples"].append(sample_grad_result)
                 
             except Exception as e:
