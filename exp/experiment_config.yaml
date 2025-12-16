@@ -93,3 +93,45 @@ global:
     # Visualization doesn't save output, but you can add settings here if needed
     # e.g., default number of tokens to show, etc.
 
+
+# =============================================================================
+# 03-gradients.py configuration
+# =============================================================================
+03_gradients:
+  input:
+    results_file: "exp/00-sample/output/results.json"  # Path to results from 00-sample.py
+
+  backend:
+    backend_type: "huggingface"
+    model_name: "/data/chenyamei/pretrained_models/Qwen3-4B"
+    backend_specific:
+      device: null
+      torch_dtype: null
+      device_map: null
+      # LoRA configuration (required for gradient extraction)
+      lora_config:
+        r: 1  # LoRA rank
+        lora_alpha: 32  # LoRA alpha scaling factor
+        target_modules:  # Modules to apply LoRA to
+          - "q_proj"
+          - "k_proj"
+          - "v_proj"
+          - "o_proj"
+          - "gate_proj"
+          - "up_proj"
+          - "down_proj"
+        lora_dropout: 0.1
+      # lora_adapter_path: null  # Optional: path to pre-trained LoRA adapter
+
+  gradient:
+    proj_dim: 8192  # Projection dimension (d)
+    device: "cuda"  # Device for projection ("cuda" or "cpu")
+    proj_type: "rademacher"  # Projection type: "normal" or "rademacher"
+    use_cuda_projector: false  # Use CUDA projector (requires fast_jl)
+    block_size: 100  # Block size for BasicProjector (if used)
+    seed: 0  # Random seed for projector
+    cuda_max_batch_size: 32  # Max batch size for CudaProjector (if used)
+
+  output:
+    dir: "exp/03-gradients/output"  # Output directory (relative to project root)
+
