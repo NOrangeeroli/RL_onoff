@@ -190,6 +190,10 @@ def main(
     # Maximum number of response tokens to process in a single gradient chunk.
     # Responses longer than this are split into multiple chunks to avoid OOM.
     token_chunk_size = int(grad_config.get("token_chunk_size", 256))
+    # Maximum total prompt length (in tokens) for gradient computation.
+    # Once original_prompt_tokens + previous_response_tokens + current_chunk_tokens
+    # would exceed this, we stop processing further chunks for this sample.
+    max_prompt_len = int(grad_config.get("max_prompt_len", 4096))
     
     print(f"Gradient config: proj_dim={proj_dim}, device={device}, proj_type={proj_type}, "
           f"use_cuda_projector={use_cuda_projector}, seed={seed}")
@@ -239,7 +243,10 @@ def main(
             try:
                 tokenizer = backend.get_tokenizer()
 
-                # Tokenize the full response once to get token IDs
+                # Tokenize the full prompt and response once to get token IDs
+                prompt_token_ids = backend.encode(prompt)
+                prompt_len = len(prompt_token_ids)
+
                 token_ids = backend.encode(response)
                 num_tokens = len(token_ids)
 
@@ -250,6 +257,13 @@ def main(
                 for start in range(0, num_tokens, token_chunk_size):
                     end = min(start + token_chunk_size, num_tokens)
                     chunk_token_ids = token_ids[start:end]
+
+                    # If including this chunk would make the total prompt length
+                    # (original prompt tokens + all response tokens up to `end`)
+                    # exceed max_prompt_len, stop processing further chunks.
+                    total_len_for_chunk = prompt_len + end
+                    if total_len_for_chunk > max_prompt_len:
+                        break
 
                     # Decode current chunk and all previous chunks back to text
                     chunk_response = tokenizer.decode(
