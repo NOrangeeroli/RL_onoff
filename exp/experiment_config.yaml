@@ -76,6 +76,7 @@ global:
   distribution:
     use_logits: false  # If true, extract logits; if false, extract probabilities
     temperature: 1.0  # Temperature for probability normalization
+    top_k: 1000  # Number of top entries to store per token (reduces storage size)
 
   output:
     dir: "exp/01-dist/output"  # Output directory (relative to project root)

@@ -222,8 +222,9 @@ def main(
     dist_config = exp_config.get("distribution", {})
     use_logits = dist_config.get("use_logits", False)
     temperature = dist_config.get("temperature", 1.0)
+    top_k = dist_config.get("top_k", 1000)  # Number of top entries to store per token
     
-    print(f"Distribution config: use_logits={use_logits}, temperature={temperature}")
+    print(f"Distribution config: use_logits={use_logits}, temperature={temperature}, top_k={top_k}")
     
     # Process each example
     print("\n" + "=" * 80)
@@ -281,9 +282,30 @@ def main(
                     temperature=temperature
                 )
                 
-                # Store distribution in compact format (will save to NPZ later)
+                # Extract top-k entries for each token position
+                # distributions shape: (num_tokens, vocab_size)
+                num_tokens = distributions.shape[0]
+                vocab_size = distributions.shape[1]
+                top_k_actual = min(top_k, vocab_size)
+                
+                # For each token position, get top-k indices and values
+                top_k_indices = np.zeros((num_tokens, top_k_actual), dtype=np.int32)
+                top_k_values = np.zeros((num_tokens, top_k_actual), dtype=distributions.dtype)
+                
+                for token_idx in range(num_tokens):
+                    # Get top-k indices (largest values)
+                    top_indices = np.argsort(distributions[token_idx])[-top_k_actual:][::-1]
+                    top_k_indices[token_idx] = top_indices
+                    top_k_values[token_idx] = distributions[token_idx][top_indices]
+                
+                # Store top-k distribution in compact format (will save to NPZ later)
                 dist_index = len(all_distributions)
-                all_distributions.append(distributions)
+                all_distributions.append({
+                    "indices": top_k_indices,
+                    "values": top_k_values,
+                    "vocab_size": vocab_size,
+                    "top_k": top_k_actual
+                })
                 
                 sample_dist_result = {
                     "sample_id": sample_id,
@@ -291,7 +313,8 @@ def main(
                     "token_ids": token_ids,
                     "token_strings": token_strings,  # Response split into tokens as tokenized
                     "distribution_index": dist_index,  # Index into the distributions array
-                    "distribution_shape": list(distributions.shape) if isinstance(distributions, np.ndarray) else None,
+                    "distribution_shape": [num_tokens, vocab_size],  # Original shape (num_tokens, vocab_size)
+                    "top_k": top_k_actual,  # Number of top entries stored per token
                     "num_tokens": len(token_ids),
                     "per_token_entropy": per_token_entropy  # Entropy for each token position
                 }
@@ -328,6 +351,7 @@ def main(
         "average_tokens_per_sample": total_tokens / total_samples if total_samples > 0 else 0,
         "distribution_type": "logits" if use_logits else "probabilities",
         "temperature": temperature,
+        "top_k": top_k,
         "backend": {
             "backend_type": backend_type_str,
             "model_name": backend_model_name,
@@ -335,15 +359,20 @@ def main(
         "input_file": str(input_results_path)
     }
     
-    # Save distributions in compact NPZ format
+    # Save distributions in compact NPZ format (top-k only)
     distributions_file = output_dir / "distributions.npz"
-    print(f"\nSaving distributions to {distributions_file}...")
+    print(f"\nSaving top-{top_k} distributions to {distributions_file}...")
     if all_distributions:
         # Save all distributions as a dictionary of arrays
-        # Key format: "dist_{index}" for each distribution
-        distributions_dict = {f"dist_{i}": dist for i, dist in enumerate(all_distributions)}
+        # Each distribution has "indices" and "values" arrays
+        distributions_dict = {}
+        for i, dist_dict in enumerate(all_distributions):
+            distributions_dict[f"dist_{i}_indices"] = dist_dict["indices"]
+            distributions_dict[f"dist_{i}_values"] = dist_dict["values"]
+            distributions_dict[f"dist_{i}_vocab_size"] = np.array([dist_dict["vocab_size"]], dtype=np.int32)
+            distributions_dict[f"dist_{i}_top_k"] = np.array([dist_dict["top_k"]], dtype=np.int32)
         np.savez_compressed(distributions_file, **distributions_dict)
-        print(f"Saved {len(all_distributions)} distributions to {distributions_file}")
+        print(f"Saved {len(all_distributions)} top-{top_k} distributions to {distributions_file}")
     else:
         print("No distributions to save")
     
@@ -375,6 +404,7 @@ def main(
     print(f"Total tokens: {total_tokens}")
     print(f"Average tokens per sample: {total_tokens / total_samples if total_samples > 0 else 0:.1f}")
     print(f"Distribution type: {'logits' if use_logits else 'probabilities'}")
+    print(f"Top-k stored per token: {top_k}")
     print("=" * 80)
 
 
@@ -415,11 +445,14 @@ def load_distributions(
         raise FileNotFoundError(f"Distributions file not found: {distributions_file}")
     
     # Load distributions from NPZ
-    print(f"Loading distributions from {distributions_file}...")
+    print(f"Loading top-k distributions from {distributions_file}...")
     distributions_data = np.load(distributions_file)
-    print(f"Loaded {len(distributions_data.files)} distributions")
     
-    # Reconstruct full structure by adding distributions to each sample
+    # Count number of distributions (each has indices and values)
+    num_dists = len([k for k in distributions_data.files if k.endswith("_indices")])
+    print(f"Loaded {num_dists} distributions")
+    
+    # Reconstruct top-k structure by adding distributions to each sample
     results = data.get("results", [])
     for example_result in results:
         for sample in example_result.get("samples", []):
@@ -429,10 +462,19 @@ def load_distributions(
             
             dist_index = sample.get("distribution_index")
             if dist_index is not None:
-                # Load the distribution array
-                dist_key = f"dist_{dist_index}"
-                if dist_key in distributions_data:
-                    sample["distributions"] = distributions_data[dist_key].tolist()
+                # Load the top-k distribution (indices and values)
+                indices_key = f"dist_{dist_index}_indices"
+                values_key = f"dist_{dist_index}_values"
+                vocab_size_key = f"dist_{dist_index}_vocab_size"
+                top_k_key = f"dist_{dist_index}_top_k"
+                
+                if indices_key in distributions_data and values_key in distributions_data:
+                    sample["top_k_distribution"] = {
+                        "indices": distributions_data[indices_key].tolist(),
+                        "values": distributions_data[values_key].tolist(),
+                        "vocab_size": int(distributions_data[vocab_size_key][0]) if vocab_size_key in distributions_data else None,
+                        "top_k": int(distributions_data[top_k_key][0]) if top_k_key in distributions_data else None
+                    }
                 else:
                     print(f"Warning: Distribution index {dist_index} not found in NPZ file")
     
