@@ -340,7 +340,7 @@ if __name__ == "__main__":
         proj_dim=8192,
         device="cuda" if torch.cuda.is_available() else "cpu",
         use_cuda_projector=True,  # set True if you have fast_jl installed
-        use_chunk=True,
+        use_chunk=False,
     )
 
     prompts = ["What is 2+2?"]
