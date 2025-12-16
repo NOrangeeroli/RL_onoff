@@ -23,31 +23,14 @@ project_root = Path(__file__).parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-
-def load_distributions(
-    json_file: Union[str, Path],
-    distributions_file: Optional[Union[str, Path]] = None
-) -> Dict:
-    """Load distributions from JSON metadata (skip NPZ loading for performance)."""
-    json_path = Path(json_file)
-    if not json_path.exists():
-        raise FileNotFoundError(f"JSON file not found: {json_path}")
-    
-    # Load JSON metadata
-    with open(json_path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-    
-    # Determine distributions file path
-    if distributions_file is None:
-        dist_filename = data.get("distributions_file", "distributions.npz")
-        distributions_file = json_path.parent / dist_filename
-    else:
-        distributions_file = Path(distributions_file)
-    
-    # Store distributions file path in data for later use
-    data["_distributions_file"] = str(distributions_file)
-    
-    return data
+# Import load_distributions from 01-dist.py
+# We need to import it from the module path since it's in the exp directory
+import importlib.util
+exp_01_dist_path = Path(__file__).parent / "01-dist.py"
+spec = importlib.util.spec_from_file_location("exp_01_dist", exp_01_dist_path)
+exp_01_dist = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(exp_01_dist)
+load_distributions = exp_01_dist.load_distributions
 
 
 @st.cache_resource
@@ -229,6 +212,11 @@ def main():
                 st.stop()
             
             data = load_distributions(str(json_file))
+            # Store distributions file path for on-demand loading
+            if "_distributions_file" not in data:
+                dist_filename = data.get("distributions_file", "distributions.npz")
+                distributions_file_path = json_file.parent / dist_filename
+                data["_distributions_file"] = str(distributions_file_path)
     except Exception as e:
         st.error(f"Error loading data: {e}")
         import traceback
