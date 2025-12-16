@@ -704,6 +704,45 @@ def sanity_checks_chunked_cuda_projector(
     print("pairwise distortion quantiles (||Px-Py|| / ||x-y||):", qs_dist)
     print(f"fraction within [1±eps] (eps={eps}):", frac_in)
 
+    # D) Top-k L2 nearest-neighbor preservation
+    print("\n--- Top-k L2 neighbor preservation test ---")
+    import torch.nn.functional as F
+    
+    topk = min(5, n - 1)  # Test top-5 neighbors
+    q_idx = 0  # Use first point as query
+    
+    # L2 distances in original space
+    qx = X[q_idx : q_idx + 1]
+    dists_orig = torch.cdist(qx, X).squeeze(0)
+    
+    # L2 distances in projected space
+    qy = Y[q_idx : q_idx + 1]
+    dists_proj = F.pairwise_distance(
+        qy.expand_as(Y), Y, p=2
+    )
+    
+    # Exclude self (index 0) when computing nearest neighbors
+    def topk_with_dists(d: torch.Tensor, topk: int):
+        vals, idx = torch.topk(d, topk + 1, largest=False)
+        # drop self (distance 0 at index 0)
+        return idx[1:], vals[1:]
+    
+    idx_orig, vals_orig = topk_with_dists(dists_orig, topk)
+    idx_proj, vals_proj = topk_with_dists(dists_proj, topk)
+    
+    top_orig = idx_orig.tolist()
+    top_proj = idx_proj.tolist()
+    
+    overlap = len(set(top_orig) & set(top_proj))
+    distort_topk = (vals_proj / vals_orig).detach().cpu().numpy()
+    
+    print(f"Top-{topk} nearest neighbors (original space) indices: {top_orig}")
+    print(f"Top-{topk} L2 distances (original): {vals_orig.tolist()}")
+    print(f"Top-{topk} nearest neighbors (projected space) indices: {top_proj}")
+    print(f"Top-{topk} L2 distances (projected): {vals_proj.tolist()}")
+    print(f"Overlap in top-{topk} neighbors: {overlap}/{topk}")
+    print(f"Per-neighbor distance ratio (||Px-P|| / ||x-P||): {distort_topk}")
+
     # Clean up
     chunked_proj.free_memory()
 
