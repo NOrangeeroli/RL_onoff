@@ -30,7 +30,13 @@ exp_01_dist_path = Path(__file__).parent / "01-dist.py"
 spec = importlib.util.spec_from_file_location("exp_01_dist", exp_01_dist_path)
 exp_01_dist = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(exp_01_dist)
-load_distributions = exp_01_dist.load_distributions
+_load_distributions_raw = exp_01_dist.load_distributions
+
+# Create a cached wrapper for load_distributions
+@st.cache_data
+def load_distributions_cached(json_file: Union[str, Path], distributions_file: Optional[Union[str, Path]] = None) -> Dict:
+    """Cached wrapper for load_distributions to avoid reloading on every rerun."""
+    return _load_distributions_raw(json_file, distributions_file)
 
 
 @st.cache_resource
@@ -47,10 +53,10 @@ def load_tokenizer(model_name: str):
 
 
 @st.cache_data
-def load_single_distribution(distributions_file: Path, dist_index: int, vocab_size: Optional[int] = None, top_k: Optional[int] = None) -> Optional[np.ndarray]:
+def load_single_distribution(distributions_file: Path, dist_index: int, vocab_size: Optional[int] = None, top_k: Optional[int] = None) -> Optional[Dict]:
     """Load a single distribution from NPZ file on-demand.
     
-    Now handles top-k format: loads indices and values, reconstructs full distribution.
+    Returns top-k data directly (indices and values) without reconstructing full distribution.
     
     Args:
         distributions_file: Path to the NPZ file
@@ -59,13 +65,17 @@ def load_single_distribution(distributions_file: Path, dist_index: int, vocab_si
         top_k: Number of top entries stored (from metadata, if available)
         
     Returns:
-        Full distribution array (num_tokens, vocab_size) with zeros for non-top-k entries,
+        Dictionary with keys:
+        - 'indices': (num_tokens, top_k) array of token IDs
+        - 'values': (num_tokens, top_k) array of probabilities/logits
+        - 'vocab_size': vocabulary size
+        - 'top_k': actual top-k value
         or None if not found
     """
     try:
         distributions_data = np.load(distributions_file)
         
-        # Try new top-k format first
+        # Load top-k format
         indices_key = f"dist_{dist_index}_indices"
         values_key = f"dist_{dist_index}_values"
         vocab_size_key = f"dist_{dist_index}_vocab_size"
@@ -82,23 +92,12 @@ def load_single_distribution(distributions_file: Path, dist_index: int, vocab_si
             if top_k_key in distributions_data:
                 top_k = int(distributions_data[top_k_key][0])
             
-            if vocab_size is None:
-                st.error(f"Could not determine vocab_size for distribution {dist_index}")
-                return None
-            
-            # Reconstruct full distribution: (num_tokens, vocab_size)
-            num_tokens = top_k_indices.shape[0]
-            full_distribution = np.zeros((num_tokens, vocab_size), dtype=top_k_values.dtype)
-            
-            # Fill in top-k values
-            for token_idx in range(num_tokens):
-                for k_idx in range(top_k_indices.shape[1]):
-                    vocab_idx = top_k_indices[token_idx, k_idx]
-                    if vocab_idx < vocab_size:  # Safety check
-                        full_distribution[token_idx, vocab_idx] = top_k_values[token_idx, k_idx]
-            
-            return full_distribution
-        
+            return {
+                "indices": top_k_indices,
+                "values": top_k_values,
+                "vocab_size": vocab_size,
+                "top_k": top_k
+            }
             
     except Exception as e:
         st.error(f"Error loading distribution {dist_index}: {e}")
@@ -151,18 +150,20 @@ def format_token_html(token: str, entropy: float, min_entropy: float, max_entrop
     return f'<span style="background-color: {color}; color: white; padding: 2px 4px; margin: 1px; border-radius: 3px; display: inline-block;" title="Entropy: {entropy:.3f}">{token_escaped}</span>'
 
 
-def get_top_tokens(distribution: np.ndarray, top_k: int = 20) -> List[Tuple[int, float]]:
-    """Get top K tokens by probability from a distribution.
+def get_top_tokens_from_topk(indices: np.ndarray, values: np.ndarray, requested_k: int) -> List[Tuple[int, float]]:
+    """Get top K tokens from already-stored top-k data.
     
     Args:
-        distribution: Probability distribution array (vocab_size,)
-        top_k: Number of top tokens to return
+        indices: Array of token IDs (top_k,)
+        values: Array of probabilities/logits (top_k,)
+        requested_k: Number of top tokens to return (must be <= len(indices))
         
     Returns:
         List of (token_id, probability) tuples, sorted by probability descending
     """
-    top_indices = np.argsort(distribution)[::-1][:top_k]
-    return [(int(idx), float(distribution[idx])) for idx in top_indices]
+    k = min(requested_k, len(indices))
+    # The data is already sorted in descending order by value, so just take first k
+    return [(int(indices[i]), float(values[i])) for i in range(k)]
 
 
 def main():
@@ -205,18 +206,18 @@ def main():
         st.stop()
     
     try:
-        with st.spinner("Loading metadata..."):
-            json_file = results_dir / "distributions.json"
-            if not json_file.exists():
-                st.error(f"JSON file not found: {json_file}")
-                st.stop()
-            
-            data = load_distributions(str(json_file))
-            # Store distributions file path for on-demand loading (needed for load_single_distribution)
-            # The imported function doesn't set this, so we add it here
-            dist_filename = data.get("distributions_file", "distributions.npz")
-            distributions_file_path = json_file.parent / dist_filename
-            data["_distributions_file"] = str(distributions_file_path)
+        json_file = results_dir / "distributions.json"
+        if not json_file.exists():
+            st.error(f"JSON file not found: {json_file}")
+            st.stop()
+        
+        # Load data with caching (only loads once, cached across reruns)
+        data = load_distributions_cached(str(json_file))
+        # Store distributions file path for on-demand loading (needed for load_single_distribution)
+        # The imported function doesn't set this, so we add it here
+        dist_filename = data.get("distributions_file", "distributions.npz")
+        distributions_file_path = json_file.parent / dist_filename
+        data["_distributions_file"] = str(distributions_file_path)
     except Exception as e:
         st.error(f"Error loading data: {e}")
         import traceback
@@ -277,15 +278,15 @@ def main():
             vocab_size = distribution_shape[1] if len(distribution_shape) >= 2 else None
             top_k = selected_sample.get("top_k")
 
-            distribution = load_single_distribution(
+            topk_data = load_single_distribution(
                 distributions_file,
                 dist_index,
                 vocab_size=vocab_size,
                 top_k=top_k,
             )
-            if distribution is not None:
+            if topk_data is not None:
                 # Cache in session_state for reuse across reruns
-                st.session_state[dist_cache_key] = distribution
+                st.session_state[dist_cache_key] = topk_data
     
     # Main content area
     col1, col2 = st.columns([1, 1])
@@ -348,27 +349,28 @@ def main():
                 key="token_selector"
             )
             
-            # Get distribution for selected token
-            distributions = (
+            # Get distribution for selected token (top-k data)
+            topk_data = (
                 st.session_state.get(dist_cache_key) if dist_cache_key is not None else None
             )
-            if distributions is not None:
-                # Convert to numpy array if it's a list
-                if isinstance(distributions, list):
-                    distributions = np.array(distributions)
+            if topk_data is not None and isinstance(topk_data, dict):
+                indices = topk_data["indices"]  # (num_tokens, top_k)
+                values = topk_data["values"]    # (num_tokens, top_k)
+                stored_top_k = topk_data.get("top_k", len(indices[0]) if len(indices) > 0 else 0)
                 
-                if selected_token_idx < len(distributions):
-                    token_dist = distributions[selected_token_idx]
+                if selected_token_idx < len(indices):
+                    token_indices = indices[selected_token_idx]  # (top_k,)
+                    token_values = values[selected_token_idx]    # (top_k,)
                     
-                    # Get all tokens or top K
-                    show_all = st.checkbox("Show all tokens (may be slow for large vocabularies)", value=False)
-                    if show_all:
-                        # Get all tokens sorted by probability
-                        all_indices = np.argsort(token_dist)[::-1]  # Sort descending
-                        top_tokens = [(int(idx), float(token_dist[idx])) for idx in all_indices]
-                    else:
-                        top_k = st.slider("Number of top tokens to show", 10, 1000, 50)
-                        top_tokens = get_top_tokens(token_dist, top_k=top_k)
+                    # Show available top-k tokens
+                    max_k = min(stored_top_k, len(token_indices))
+                    requested_k = st.slider(
+                        f"Number of top tokens to show (max: {max_k})", 
+                        10, 
+                        max_k, 
+                        min(50, max_k)
+                    )
+                    top_tokens = get_top_tokens_from_topk(token_indices, token_values, requested_k)
                     
                     # Create bar chart (will be created later with token labels)
                     # Ensure sorted by probability (descending)
