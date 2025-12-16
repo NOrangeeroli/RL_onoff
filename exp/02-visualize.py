@@ -64,21 +64,59 @@ def load_tokenizer(model_name: str):
 
 
 @st.cache_data
-def load_single_distribution(distributions_file: Path, dist_index: int) -> Optional[np.ndarray]:
+def load_single_distribution(distributions_file: Path, dist_index: int, vocab_size: Optional[int] = None, top_k: Optional[int] = None) -> Optional[np.ndarray]:
     """Load a single distribution from NPZ file on-demand.
+    
+    Now handles top-k format: loads indices and values, reconstructs full distribution.
     
     Args:
         distributions_file: Path to the NPZ file
         dist_index: Index of the distribution to load
+        vocab_size: Vocabulary size (from metadata, if available)
+        top_k: Number of top entries stored (from metadata, if available)
         
     Returns:
-        Distribution array or None if not found
+        Full distribution array (num_tokens, vocab_size) with zeros for non-top-k entries,
+        or None if not found
     """
     try:
         distributions_data = np.load(distributions_file)
-        dist_key = f"dist_{dist_index}"
-        if dist_key in distributions_data:
-            return distributions_data[dist_key]
+        
+        # Try new top-k format first
+        indices_key = f"dist_{dist_index}_indices"
+        values_key = f"dist_{dist_index}_values"
+        vocab_size_key = f"dist_{dist_index}_vocab_size"
+        top_k_key = f"dist_{dist_index}_top_k"
+        
+        if indices_key in distributions_data and values_key in distributions_data:
+            # Load top-k data
+            top_k_indices = distributions_data[indices_key]  # (num_tokens, top_k)
+            top_k_values = distributions_data[values_key]   # (num_tokens, top_k)
+            
+            # Get vocab_size and top_k from NPZ if available, otherwise use provided values
+            if vocab_size_key in distributions_data:
+                vocab_size = int(distributions_data[vocab_size_key][0])
+            if top_k_key in distributions_data:
+                top_k = int(distributions_data[top_k_key][0])
+            
+            if vocab_size is None:
+                st.error(f"Could not determine vocab_size for distribution {dist_index}")
+                return None
+            
+            # Reconstruct full distribution: (num_tokens, vocab_size)
+            num_tokens = top_k_indices.shape[0]
+            full_distribution = np.zeros((num_tokens, vocab_size), dtype=top_k_values.dtype)
+            
+            # Fill in top-k values
+            for token_idx in range(num_tokens):
+                for k_idx in range(top_k_indices.shape[1]):
+                    vocab_idx = top_k_indices[token_idx, k_idx]
+                    if vocab_idx < vocab_size:  # Safety check
+                        full_distribution[token_idx, vocab_idx] = top_k_values[token_idx, k_idx]
+            
+            return full_distribution
+        
+            
     except Exception as e:
         st.error(f"Error loading distribution {dist_index}: {e}")
     return None
@@ -244,7 +282,17 @@ def main():
     # Load distribution for selected sample on-demand
     dist_index = selected_sample.get("distribution_index")
     if dist_index is not None and distributions_file.exists():
-        distribution = load_single_distribution(distributions_file, dist_index)
+        # Get vocab_size and top_k from sample metadata
+        distribution_shape = selected_sample.get("distribution_shape", [])
+        vocab_size = distribution_shape[1] if len(distribution_shape) >= 2 else None
+        top_k = selected_sample.get("top_k")
+        
+        distribution = load_single_distribution(
+            distributions_file, 
+            dist_index,
+            vocab_size=vocab_size,
+            top_k=top_k
+        )
         if distribution is not None:
             # Convert to list and store in sample
             selected_sample["distributions"] = distribution.tolist()
@@ -441,7 +489,17 @@ def main():
                 # Try to load if we have the index
                 if dist_index is not None and distributions_file.exists():
                     with st.spinner("Loading distribution..."):
-                        distribution = load_single_distribution(distributions_file, dist_index)
+                        # Get vocab_size and top_k from sample metadata
+                        distribution_shape = selected_sample.get("distribution_shape", [])
+                        vocab_size = distribution_shape[1] if len(distribution_shape) >= 2 else None
+                        top_k = selected_sample.get("top_k")
+                        
+                        distribution = load_single_distribution(
+                            distributions_file, 
+                            dist_index,
+                            vocab_size=vocab_size,
+                            top_k=top_k
+                        )
                         if distribution is not None:
                             selected_sample["distributions"] = distribution.tolist()
                             st.rerun()
