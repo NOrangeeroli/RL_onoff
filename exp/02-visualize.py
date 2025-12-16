@@ -266,24 +266,26 @@ def main():
     )
     
     selected_sample = valid_samples[selected_sample_idx]
-    
-    # Load distribution for selected sample on-demand
+
+    # Load distribution for selected sample on-demand, cached in session_state
     dist_index = selected_sample.get("distribution_index")
+    dist_cache_key = f"dist_{dist_index}" if dist_index is not None else None
     if dist_index is not None and distributions_file.exists():
-        # Get vocab_size and top_k from sample metadata
-        distribution_shape = selected_sample.get("distribution_shape", [])
-        vocab_size = distribution_shape[1] if len(distribution_shape) >= 2 else None
-        top_k = selected_sample.get("top_k")
-        
-        distribution = load_single_distribution(
-            distributions_file, 
-            dist_index,
-            vocab_size=vocab_size,
-            top_k=top_k
-        )
-        if distribution is not None:
-            # Convert to list and store in sample
-            selected_sample["distributions"] = distribution.tolist()
+        if dist_cache_key not in st.session_state:
+            # Get vocab_size and top_k from sample metadata
+            distribution_shape = selected_sample.get("distribution_shape", [])
+            vocab_size = distribution_shape[1] if len(distribution_shape) >= 2 else None
+            top_k = selected_sample.get("top_k")
+
+            distribution = load_single_distribution(
+                distributions_file,
+                dist_index,
+                vocab_size=vocab_size,
+                top_k=top_k,
+            )
+            if distribution is not None:
+                # Cache in session_state for reuse across reruns
+                st.session_state[dist_cache_key] = distribution
     
     # Main content area
     col1, col2 = st.columns([1, 1])
@@ -347,8 +349,10 @@ def main():
             )
             
             # Get distribution for selected token
-            distributions = selected_sample.get("distributions")
-            if distributions:
+            distributions = (
+                st.session_state.get(dist_cache_key) if dist_cache_key is not None else None
+            )
+            if distributions is not None:
                 # Convert to numpy array if it's a list
                 if isinstance(distributions, list):
                     distributions = np.array(distributions)
@@ -473,24 +477,7 @@ def main():
                             for token_id, prob in top_tokens:
                                 st.write(f"Token ID {token_id}: {prob:.6f}")
             else:
-                st.warning("Distribution data not available. Loading...")
-                # Try to load if we have the index
-                if dist_index is not None and distributions_file.exists():
-                    with st.spinner("Loading distribution..."):
-                        # Get vocab_size and top_k from sample metadata
-                        distribution_shape = selected_sample.get("distribution_shape", [])
-                        vocab_size = distribution_shape[1] if len(distribution_shape) >= 2 else None
-                        top_k = selected_sample.get("top_k")
-                        
-                        distribution = load_single_distribution(
-                            distributions_file, 
-                            dist_index,
-                            vocab_size=vocab_size,
-                            top_k=top_k
-                        )
-                        if distribution is not None:
-                            selected_sample["distributions"] = distribution.tolist()
-                            st.rerun()
+                st.warning("Distribution data not available for this sample.")
         else:
             st.info("No token information available")
     
