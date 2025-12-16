@@ -131,6 +131,7 @@ global:
     block_size: 100  # Block size for BasicProjector (if used)
     seed: 0  # Random seed for projector
     cuda_max_batch_size: 32  # Max batch size for CudaProjector (if used)
+    token_chunk_size: 1024  # Maximum number of response tokens to process in a single gradient chunk.
 
   output:
     dir: "exp/03-gradients/output"  # Output directory (relative to project root)
